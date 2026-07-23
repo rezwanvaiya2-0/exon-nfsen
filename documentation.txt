@@ -1,0 +1,222 @@
+Installing NFSEN & NFDUMP on Ubuntu
+
+Distributor ID: Ubuntu
+Description:    Ubuntu 20.04.2 LTS
+Release:        20.04
+Codename:       focal
+
+Update Ubuntu:
+apt-get update
+apt autoremove
+Create and navigate to a new folder:
+mkdir ~/nfsen && cd ~/nfsen
+
+Download the required files:
+wget https://bit.ly/2NpMHqV     >>> NfSend
+wget https://github.com/phaag/nfdump/archive/v1.6.17.tar.gz    >>>NfDump
+
+
+Extract the files:
+tar zxfv 2NpMHqV
+tar xzfv v1.6.17.tar.gz
+
+Install Dependencies
+apt install make gcc flex rrdtool librrd-dev libpcap-dev php librrds-perl libsocket6-perl apache2 libapache2-mod-php libtool dh-autoreconf pkg-config libbz2-dev byacc doxygen graphviz librrdp-perl libmailtools-perl build-essential autoconf
+
+
+Make sure the right version of PHP is being used:
+a2enmod php7.4
+
+Fix the problem with displaying icons in NFSen:
+nano /etc/apache2/mods-enabled/alias.conf
+and comment out line by # : 'Alias /icons/ "/usr/share/apache2/icons/"
+
+
+In the php.ini file, be sure to specify the correct time zone, for example:
+nano /etc/php/7.4/apache2/php.ini
+date.timezone = Asia/Dhaka
+
+Remove the ; semicolon before date.timezone = Asia/Dhaka
+
+
+Prepare nfdump for compilation:
+cd nfdump-1.6.17/
+sh ./autogen.sh 
+./configure --enable-nsel --enable-nfprofile --enable-sflow --enable-readpcap --enable-nfpcapd --enable-nftrack --enable-jnat
+
+
+Compile and install nfdump
+make && make install
+
+
+Install nfsen dependencies:
+cpan App::cpanminus
+cpanm Mail::Header
+cpanm Mail::Internet 
+
+
+The commands take time for the first one and the second one. Please wait while it executes. 
+
+Then run: 
+
+
+/sbin/ldconfig 
+
+  ldconfig     
+
+
+Check the nfdump version:
+nfdump -V
+
+
+Configure nfsen:
+cd ../nfsen-1.3.6p1       
+
+Cd etc/
+
+nano nfsen.conf       > nano nfsen-dist.conf 
+
+Edit those lines: 
+$BASEDIR = "/data/nfsen"; > $BASEDIR = "/var/nfsen";
+$WWWUSER  = "www-";  >   $WWWUSER  = "www-data";
+$WWWGROUP = "www-";  >   $WWWGROUP = "www-data";   
+And more below you will find the router config like: 
+
+%sources = (
+    'exonhost_microtik'    => { 'port' => '2055', 'col' => '#0000ff', 'type' => 'netflow' },
+    'peer1'        => { 'port' => '9996', 'IP' => '172.16.17.18' },
+    'peer2'        => { 'port' => '9996', 'IP' => '172.16.17.19' },
+);
+On this directory: root@server:~/nfsen/nfsen-1.3.6p1/etc# nano nfsen.conf
+
+
+Add the user used by nfsen:
+useradd -M -s /bin/false -G www-data netflow
+
+Create the nfsen base directory:
+mkdir – p /var/nfsen
+
+And run the exit command to get back to the root. 
+
+Then go to: root@server:~/nfsen/nfsen-1.3.6p1#
+If there is a version mismatch, change this:
+Check first whether there is a version of mitcmatch. It must be 1.8. If anything, then change it to the correct version. 
+
+
+nano libexec/NfSenRRD.pm
+Change from 1.5 to 1.8 : 
+
+
+ if ( $rrd_version >= 1.2 && $rrd_version < 1.8 ) {
+                $RRDoffset = 67;
+
+
+Install nfsen:
+./install.pl ./etc/nfsen.conf   >  ./install.pl ./etc/nfsen-dist.conf
+
+If stuck after this line: Perl to use: [/usr/bin/perl] then just press enter.
+
+
+
+You have successfully created the nfsen directories. 
+
+Point default Apache site to nfsen.php file:
+
+Make the virtualhost IP: 8070 and anything you want.
+nano /etc/apache2/sites-enabled/000-default.conf
+        ServerAdmin webmaster@localhost
+        DocumentRoot /var/www/nfsen
+        DirectoryIndex nfsen.php
+        ServerName 103.159.37.199 ( Your VPS OR LOCALHOST IP )
+
+
+
+Run: nano /etc/apache2/apache2.conf
+
+<Directory /var/www/>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+</Directory>
+
+Change words None to > all
+
+And save. 
+
+
+
+Change the Apache2 port that you changed before like 8070.
+root@server:~/nfsen/nfsen-1.3.6p1# nano /etc/apache2/ports.conf
+
+Change this line to 8070: Listen 8070
+
+Then run this command to start Apache2:
+systemctl enable apache2
+systemctl start apache2
+systemctl status apache2
+
+
+Start the nfsen service:
+/var/nfsen/bin/nfsen start
+
+
+Restart Apache:
+systemctl restart apache2
+
+
+
+To make nfsen reboot-proof:
+ln -s /var/nfsen/bin/nfsen  /etc/init.d/nfsen
+update-rc.d nfsen defaults 20
+
+
+Check the nfsen service:
+
+systemctl start nfsen.service
+systemctl status nfsen.service
+
+
+It remains to configure the web server or just create a symbolic link in the www directory (after that you can open nfsen in a browser, for example http://103.159.37.199:8070/nfsen.php :
+
+
+Run this command: ln -s /var/www/nfsen/ /var/www/html/nfsen
+
+After adding the router to the configuration, you have to reconfigure the router data. 
+
+sudo /etc/init.d/nfsen reconfig
+
+
+Router adding config: nano /var/nfsen/etc/nfsen.conf > nfsen-dist.conf
+
+Note: 
+
+You modified /var/nfsen/etc/nfsen-dist.conf. In the world of NfSen, the -dist file is a distribution template. It is meant to be a reference, not the live configuration.
+The Fix: You need to edit nfsen.conf, not nfsen-dist.conf.
+
+
+
+
+Troubleshooting commands:
+sudo netstat -tulpn
+ls -l /var/nfsen/profiles-stat/live
+timedatectl set-timezone Asia/Dhaka
+chmod -R 777 /var/nfsen/var/run/nfsen.comm
+chown -R www-data:www-data /var/nfsen
+chown -R netflow:www-data /var/nfsen/profiles-data/live/
+
+tcpdump port 2055 -e -n
+
+# Make sure nfsen main directory is owned properly
+chown -R netflow:www-data /var/nfsen
+
+
+# Allow full access between collector (netflow) and web user (www-data)
+chmod -R 775 /var/nfsen
+
+
+# Specifically fix the communication socket
+chmod 777 /var/nfsen/var/run/nfsen.comm
+
+Then restart nfsen with this command:
+
+systemctl restart nfsen.service
