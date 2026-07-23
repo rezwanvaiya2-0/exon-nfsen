@@ -103,6 +103,8 @@ RUN cd /tmp/nfsen-1.3.6p1 \
     && echo "[STEP 11] Fixing install.pl exit calls..." \
     && sed -i 's/exit 2;/# exit 2;/g' install.pl \
     && sed -i '/not yet supported/d' install.pl \
+    && echo "[STEP 11] Fixing Nfsync.pm semaphore die -> warn..." \
+    && sed -i 's/|| die "Can not get semaphore/|| warn "Can not get semaphore/g' libexec/Nfsync.pm \
     && echo "[STEP 11] Version checks patched"
 
 # ===========================================================================
