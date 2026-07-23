@@ -45,26 +45,27 @@ cmd_add() {
     [ -z "$NAME" ] && { echo -e "${RED}--name required${NC}"; exit 1; }
     check_running
 
-    # Use heredoc passed via stdin to avoid quoting issues
-    docker exec -i exon-nfsen bash << 'SCRIPT'
-NAME="'"$NAME"'"
-PORT="'"$PORT"'"
-IP="'"$IP"'"
-COLOR="'"$COLOR"'"
+    # Pass variables as environment vars (-e) to avoid quoting issues
+    docker exec -i \
+        -e NFSEN_NAME="$NAME" \
+        -e NFSEN_PORT="$PORT" \
+        -e NFSEN_IP="$IP" \
+        -e NFSEN_COLOR="$COLOR" \
+        exon-nfsen bash << 'SCRIPT'
 CONF="/var/nfsen/etc/nfsen.conf"
 
 # Check if already exists
-if grep -q "'$NAME' =>" "$CONF"; then
-    echo "Source '$NAME' already exists. Skipping."
+if grep -q "'$NFSEN_NAME' =>" "$CONF" 2>/dev/null; then
+    echo "Source '$NFSEN_NAME' already exists. Skipping."
     exit 0
 fi
 
 # Build source line
-LINE="    '${NAME}' => { 'port' => '${PORT}', 'col' => '${COLOR}', 'type' => 'netflow' }"
-[ -n "$IP" ] && LINE="    '${NAME}' => { 'port' => '${PORT}', 'col' => '${COLOR}', 'type' => 'netflow', 'IP' => '${IP}' }"
+LINE="    '${NFSEN_NAME}' => { 'port' => '${NFSEN_PORT}', 'col' => '${NFSEN_COLOR}', 'type' => 'netflow' }"
+[ -n "$NFSEN_IP" ] && LINE="    '${NFSEN_NAME}' => { 'port' => '${NFSEN_PORT}', 'col' => '${NFSEN_COLOR}', 'type' => 'netflow', 'IP' => '${NFSEN_IP}' }"
 
-# Insert before the closing ); using awk
-awk -v l="$LINE" '/^\);$/ { print l ","; print; next } { print }' "$CONF" > "${CONF}.tmp" && mv "${CONF}.tmp" "$CONF"
+# Insert before the FIRST closing );
+awk -v l="$LINE" '!found && /^\);$/ { print l ","; print; found=1; next } { print }' "$CONF" > "${CONF}.tmp" && mv "${CONF}.tmp" "$CONF"
 echo "OK"
 SCRIPT
 
@@ -103,16 +104,15 @@ cmd_remove() {
     [ -z "$NAME" ] && { echo -e "${RED}--name required${NC}"; exit 1; }
     check_running
 
-    docker exec -i exon-nfsen bash << 'SCRIPT'
-NAME="'"$NAME"'"
+    docker exec -i -e NFSEN_NAME="$NAME" exon-nfsen bash << 'SCRIPT'
 CONF="/var/nfsen/etc/nfsen.conf"
 
-if ! grep -q "'$NAME' =>" "$CONF" 2>/dev/null; then
-    echo "Source '$NAME' not found."
+if ! grep -q "'$NFSEN_NAME' =>" "$CONF" 2>/dev/null; then
+    echo "Source '$NFSEN_NAME' not found."
     exit 1
 fi
 
-grep -v "'$NAME' =>" "$CONF" > "${CONF}.tmp" && mv "${CONF}.tmp" "$CONF"
+grep -v "'$NFSEN_NAME' =>" "$CONF" > "${CONF}.tmp" && mv "${CONF}.tmp" "$CONF"
 echo "OK"
 SCRIPT
 
