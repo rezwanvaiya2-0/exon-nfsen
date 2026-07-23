@@ -74,8 +74,8 @@ docker-compose down && docker-compose up -d
 If you edit `nfsen.conf` manually inside the container:
 
 ```bash
-# Edit the config
-docker exec -it exon-nfsen nano /var/nfsen/etc/nfsen.conf
+# Edit the config (vi is built-in; install nano: apt-get install -y nano)
+docker exec -it exon-nfsen vi /var/nfsen/etc/nfsen.conf
 
 # Apply changes
 docker exec exon-nfsen /var/nfsen/bin/nfsen reconfig
