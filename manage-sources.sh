@@ -124,7 +124,7 @@ cmd_remove() {
         if (index($0, q name q " =>")) { found = 1; next }
         print
     }
-    END { if (!found) print "NOTFOUND" > "/dev/stderr" }
+    END { if (!found) exit 1 }
     '
 
     local RC=$?
