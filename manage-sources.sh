@@ -78,18 +78,18 @@ edit_config() {
 }
 
 timeout_exec() {
-    local TIMEOUT=$1
-    shift
-    local DESC="$1"
-    shift
-    cmd "docker exec exon-nfsen $@ (timeout: ${TIMEOUT}s)"
-    timeout $TIMEOUT docker exec exon-nfsen "$@" 2>&1 | grep -v 'redefined\|sockaddr_in6\|setlogsock\|Invalid argument' | tail -5 &
+    local TIMEOUT=$1; shift
+    local DESC="$1"; shift
+    local OUTF="/tmp/nfsen_output.txt"
+    cmd "docker exec exon-nfsen $* (timeout: ${TIMEOUT}s)"
+    timeout $TIMEOUT docker exec exon-nfsen "$@" > "$OUTF" 2>&1 &
     local PID=$!
     spinner $PID "$DESC"
     wait $PID
     local RC=$?
-    [ $RC -eq 124 ] && warn "Command timed out after ${TIMEOUT}s - continuing"
-    [ $RC -eq 0 ] && ok "$DESC"
+    grep -v 'redefined\|sockaddr_in6\|setlogsock\|Invalid argument' "$OUTF" | tail -5
+    rm -f "$OUTF"
+    [ $RC -eq 124 ] && warn "Timed out after ${TIMEOUT}s - continuing"
     return 0
 }
 
