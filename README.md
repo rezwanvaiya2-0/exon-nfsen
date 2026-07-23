@@ -22,7 +22,7 @@ Replace `NAME`, `IP`, `PORT`, and `COLOR` with your values:
 
 ```bash
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
-sed -i 's/^);$/    '"'"'NAME'"'"' => { '"'"'port'"'"' => '"'"'PORT'"'"', '"'"'IP'"'"' => '"'"'IP_ADDRESS'"'"', '"'"'col'"'"' => '"'"'#COLOR'"'"', '"'"'type'"'"' => '"'"'netflow'"'"' },/' /tmp/nfsen.conf && \
+sed -i "/^);$/i\    '"'"'NAME'"'"' => { '"'"'port'"'"' => '"'"'PORT'"'"', '"'"'IP'"'"' => '"'"'IP_ADDRESS'"'"', '"'"'col'"'"' => '"'"'#COLOR'"'"', '"'"'type'"'"' => '"'"'netflow'"'"' }," /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
 docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
 echo "✓ Done"
@@ -32,7 +32,7 @@ echo "✓ Done"
 
 ```bash
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
-sed -i 's/^);$/    '"'"'router1'"'"' => { '"'"'port'"'"' => '"'"'2055'"'"', '"'"'IP'"'"' => '"'"'103.159.36.253'"'"', '"'"'col'"'"' => '"'"'#32CD32'"'"', '"'"'type'"'"' => '"'"'netflow'"'"' },/' /tmp/nfsen.conf && \
+sed -i "/^);$/i\    '"'"'router1'"'"' => { '"'"'port'"'"' => '"'"'2055'"'"', '"'"'IP'"'"' => '"'"'103.159.36.253'"'"', '"'"'col'"'"' => '"'"'#32CD32'"'"', '"'"'type'"'"' => '"'"'netflow'"'"' }," /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
 docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
 echo "✓ Done"
@@ -42,7 +42,7 @@ echo "✓ Done"
 
 ```bash
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
-sed -i 's/^);$/    '"'"'NAME'"'"' => { '"'"'port'"'"' => '"'"'PORT'"'"', '"'"'col'"'"' => '"'"'#COLOR'"'"', '"'"'type'"'"' => '"'"'netflow'"'"' },/' /tmp/nfsen.conf && \
+sed -i "/^);$/i\    '"'"'NAME'"'"' => { '"'"'port'"'"' => '"'"'PORT'"'"', '"'"'col'"'"' => '"'"'#COLOR'"'"', '"'"'type'"'"' => '"'"'netflow'"'"' }," /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
 docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
 echo "✓ Done"
@@ -58,7 +58,7 @@ docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
 echo "✓ Removed"
 ```
 
-Example with router named `router1`:
+Example:
 ```bash
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
 sed -i "/'router1' =>/d" /tmp/nfsen.conf && \
@@ -89,7 +89,7 @@ If you use a port other than `2055`, update `docker-compose.yml`:
 ports:
   - "8070:8070"
   - "2055:2055/udp"
-  - "2056:2056/udp"   # Add this for each new port
+  - "2056:2056/udp"
 ```
 
 Then restart:
@@ -99,18 +99,17 @@ docker-compose down && docker-compose up -d
 
 ---
 
-## Important Notes
+## Notes
 
-- **Config changes persist** as long as the container exists
-- **Re-running `docker-compose build`** will reset the config — re-run the add commands after a rebuild
-- **Data in volumes** (NetFlow data, stats, logs) survives rebuilds
+- Config changes persist as long as the container exists
+- Rebuilding the image resets config — re-run the add commands
+- NetFlow data in Docker volumes survives rebuilds
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| Web UI shows `nfsend connect() error` | Run: `docker exec exon-nfsen /var/nfsen/bin/nfsen restart` |
+| Web UI shows `nfsend connect() error` | `docker exec exon-nfsen /var/nfsen/bin/nfsen restart` |
 | Port already in use | Change Apache port in `docker-compose.yml` |
 | Can't access port 8070 | Check firewall: `ufw allow 8070/tcp` |
-| NfSen not starting | Check logs: `docker logs exon-nfsen --tail 30` |
-| Need to add multiple routers | Run the `Adding a Router Source` command again with different values |
+| NfSen not starting | `docker logs exon-nfsen --tail 30` |
