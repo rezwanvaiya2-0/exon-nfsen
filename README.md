@@ -16,13 +16,13 @@ Timezone: **Asia/Dhaka**
 
 ---
 
-## Adding a Router Source (Manual)
+## Adding a Router Source
 
 Replace `NAME`, `IP`, `PORT`, and `COLOR` with your values:
 
 ```bash
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
-sed -i "/^);$/i\    '"'"'NAME'"'"' => { '"'"'port'"'"' => '"'"'PORT'"'"', '"'"'IP'"'"' => '"'"'IP_ADDRESS'"'"', '"'"'col'"'"' => '"'"'#COLOR'"'"', '"'"'type'"'"' => '"'"'netflow'"'"' }," /tmp/nfsen.conf && \
+sed -i "/^);$/i\    'NAME' => { 'port' => 'PORT', 'IP' => 'IP_ADDRESS', 'col' => '#COLOR', 'type' => 'netflow' }," /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
 docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
 echo "✓ Done"
@@ -32,7 +32,7 @@ echo "✓ Done"
 
 ```bash
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
-sed -i "/^);$/i\    '"'"'router1'"'"' => { '"'"'port'"'"' => '"'"'2055'"'"', '"'"'IP'"'"' => '"'"'103.159.36.253'"'"', '"'"'col'"'"' => '"'"'#32CD32'"'"', '"'"'type'"'"' => '"'"'netflow'"'"' }," /tmp/nfsen.conf && \
+sed -i "/^);$/i\    'router1' => { 'port' => '2055', 'IP' => '103.159.36.253', 'col' => '#32CD32', 'type' => 'netflow' }," /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
 docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
 echo "✓ Done"
@@ -42,7 +42,7 @@ echo "✓ Done"
 
 ```bash
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
-sed -i "/^);$/i\    '"'"'NAME'"'"' => { '"'"'port'"'"' => '"'"'PORT'"'"', '"'"'col'"'"' => '"'"'#COLOR'"'"', '"'"'type'"'"' => '"'"'netflow'"'"' }," /tmp/nfsen.conf && \
+sed -i "/^);$/i\    'NAME' => { 'port' => 'PORT', 'col' => '#COLOR', 'type' => 'netflow' }," /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
 docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
 echo "✓ Done"
