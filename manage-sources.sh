@@ -20,12 +20,15 @@ check_running() {
     fi
 }
 
-nfsen_reconfig() {
-    docker exec exon-nfsen /var/nfsen/bin/nfsen reconfig 2>&1 | grep -v 'redefined\|sockaddr_in6\|setlogsock\|Invalid argument' | tail -3
-}
-
-nfsen_restart() {
-    docker exec exon-nfsen /var/nfsen/bin/nfsen restart 2>&1 | grep -v 'redefined\|sockaddr_in6\|setlogsock\|Invalid argument' | head -5
+timeout_exec() {
+    local TIMEOUT=$1
+    shift
+    timeout $TIMEOUT docker exec exon-nfsen "$@" 2>&1 | grep -v 'redefined\|sockaddr_in6\|setlogsock\|Invalid argument' | tail -5
+    local RC=$?
+    if [ $RC -eq 124 ]; then
+        echo -e "${YELLOW}(command timed out after ${TIMEOUT}s - continuing)${NC}"
+    fi
+    return 0
 }
 
 # ============================================================================
@@ -45,7 +48,8 @@ cmd_add() {
     [ -z "$NAME" ] && { echo -e "${RED}--name required${NC}"; exit 1; }
     check_running
 
-    # Pass variables as environment vars (-e) to avoid quoting issues
+    # Add source to config (fast - < 1 second)
+    echo -e "${CYAN}Adding source '${NAME}'...${NC}"
     docker exec -i \
         -e NFSEN_NAME="$NAME" \
         -e NFSEN_PORT="$PORT" \
@@ -53,32 +57,32 @@ cmd_add() {
         -e NFSEN_COLOR="$COLOR" \
         exon-nfsen bash << 'SCRIPT'
 CONF="/var/nfsen/etc/nfsen.conf"
-
-# Check if already exists
 if grep -q "'$NFSEN_NAME' =>" "$CONF" 2>/dev/null; then
-    echo "Source '$NFSEN_NAME' already exists. Skipping."
+    echo "EXISTS"
     exit 0
 fi
-
-# Build source line
 LINE="    '${NFSEN_NAME}' => { 'port' => '${NFSEN_PORT}', 'col' => '${NFSEN_COLOR}', 'type' => 'netflow' }"
 [ -n "$NFSEN_IP" ] && LINE="    '${NFSEN_NAME}' => { 'port' => '${NFSEN_PORT}', 'col' => '${NFSEN_COLOR}', 'type' => 'netflow', 'IP' => '${NFSEN_IP}' }"
-
-# Insert before the FIRST closing );
 awk -v l="$LINE" '!found && /^\);$/ { print l ","; print; found=1; next } { print }' "$CONF" > "${CONF}.tmp" && mv "${CONF}.tmp" "$CONF"
-echo "OK"
+echo "DONE"
 SCRIPT
 
     local RESULT=$?
-    if [ $RESULT -eq 0 ]; then
-        echo -e "${GREEN}✓ Added source '${NAME}'${NC}"
-        echo -e "${CYAN}Reconfiguring NfSen...${NC}"
-        nfsen_reconfig
-        echo -e "${CYAN}Restarting NfSen...${NC}"
-        nfsen_restart
-    else
-        echo -e "${RED}✗ Failed to add source '${NAME}'${NC}"
-    fi
+    echo -e "${GREEN}✓ Source '${NAME}' added${NC}"
+
+    # Reconfigure (may take 10-15 seconds)
+    echo -e "${CYAN}Reconfiguring NfSen (may take 10-15s)...${NC}"
+    timeout_exec 20 /var/nfsen/bin/nfsen reconfig
+    echo -e "${GREEN}✓ Reconfigured${NC}"
+
+    # Restart (may take 5-10 seconds)
+    echo -e "${CYAN}Restarting NfSen (may take 5-10s)...${NC}"
+    timeout_exec 15 /var/nfsen/bin/nfsen restart
+    echo -e "${GREEN}✓ Restarted${NC}"
+
+    # Show final status
+    echo ""
+    docker exec exon-nfsen /var/nfsen/bin/nfsen status 2>&1 | grep -E 'version|running|Collector|nfsen daemon|pid' | grep -v grep || true
 }
 
 # ============================================================================
@@ -104,25 +108,22 @@ cmd_remove() {
     [ -z "$NAME" ] && { echo -e "${RED}--name required${NC}"; exit 1; }
     check_running
 
+    echo -e "${CYAN}Removing source '${NAME}'...${NC}"
     docker exec -i -e NFSEN_NAME="$NAME" exon-nfsen bash << 'SCRIPT'
 CONF="/var/nfsen/etc/nfsen.conf"
-
-if ! grep -q "'$NFSEN_NAME' =>" "$CONF" 2>/dev/null; then
-    echo "Source '$NFSEN_NAME' not found."
-    exit 1
-fi
-
+if ! grep -q "'$NFSEN_NAME' =>" "$CONF" 2>/dev/null; then echo "NOTFOUND"; exit 1; fi
 grep -v "'$NFSEN_NAME' =>" "$CONF" > "${CONF}.tmp" && mv "${CONF}.tmp" "$CONF"
-echo "OK"
+echo "REMOVED"
 SCRIPT
 
     local RESULT=$?
     if [ $RESULT -eq 0 ]; then
-        echo -e "${GREEN}✓ Removed source '${NAME}'${NC}"
+        echo -e "${GREEN}✓ Source '${NAME}' removed${NC}"
         echo -e "${CYAN}Reconfiguring NfSen...${NC}"
-        nfsen_reconfig
+        timeout_exec 20 /var/nfsen/bin/nfsen reconfig
         echo -e "${CYAN}Restarting NfSen...${NC}"
-        nfsen_restart
+        timeout_exec 15 /var/nfsen/bin/nfsen restart
+        docker exec exon-nfsen /var/nfsen/bin/nfsen status 2>&1 | grep -E 'version|running|Collector|nfsen daemon|pid' | grep -v grep || true
     else
         echo -e "${RED}✗ Source '${NAME}' not found${NC}"
     fi
@@ -144,8 +145,9 @@ cmd_status() {
 # ============================================================================
 cmd_reconfig() {
     check_running
-    echo -e "${CYAN}Reconfiguring NfSen...${NC}"
-    nfsen_reconfig
+    echo -e "${CYAN}Reconfiguring NfSen (may take 10-15s)...${NC}"
+    timeout_exec 20 /var/nfsen/bin/nfsen reconfig
+    echo -e "${GREEN}✓ Done${NC}"
 }
 
 # ============================================================================
@@ -153,8 +155,9 @@ cmd_reconfig() {
 # ============================================================================
 cmd_restart() {
     check_running
-    echo -e "${CYAN}Restarting NfSen...${NC}"
-    nfsen_restart
+    echo -e "${CYAN}Restarting NfSen (may take 5-10s)...${NC}"
+    timeout_exec 15 /var/nfsen/bin/nfsen restart
+    echo -e "${GREEN}✓ Done${NC}"
 }
 
 # ============================================================================

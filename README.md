@@ -18,6 +18,14 @@ Timezone: **Asia/Dhaka**
 
 ## Router Source Management
 
+### Prerequisites
+
+First, make the script executable:
+
+```bash
+chmod +x manage-sources.sh
+```
+
 ### Add a router source
 
 ```bash
