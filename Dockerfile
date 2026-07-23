@@ -125,12 +125,7 @@ RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/s/AllowOverride None/Allow
     /etc/apache2/apache2.conf 2>/dev/null || true
 
 # ===========================================================================
-# STEP 15: Create symlink (guide: DocumentRoot /var/www/nfsen)
-# ===========================================================================
-RUN mkdir -p /var/www && ln -sf /var/nfsen/www /var/www/nfsen
-
-# ===========================================================================
-# STEP 16: Configure ownership and permissions (guide's troubleshooting)
+# STEP 15: Configure ownership and permissions (guide's troubleshooting)
 # ===========================================================================
 RUN chown -R www-data:www-data /var/nfsen && \
     chown -R netflow:www-data /var/nfsen/profiles-data/live/ 2>/dev/null || true && \
@@ -138,12 +133,12 @@ RUN chown -R www-data:www-data /var/nfsen && \
     chmod 777 /var/nfsen/var/run 2>/dev/null || true
 
 # ===========================================================================
-# STEP 17: Make nfsen reboot proof (guide: init.d symlink)
+# STEP 16: Make nfsen reboot proof (guide: init.d symlink)
 # ===========================================================================
 RUN ln -sf /var/nfsen/bin/nfsen /etc/init.d/nfsen
 
 # ===========================================================================
-# STEP 18: Copy entrypoint
+# STEP 17: Copy entrypoint
 # ===========================================================================
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
