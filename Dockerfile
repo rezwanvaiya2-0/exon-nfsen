@@ -94,14 +94,16 @@ RUN useradd -M -s /bin/false -G www-data netflow \
 # ===========================================================================
 # STEP 11: Fix RRD version check in NfSenRRD.pm + install.pl
 # Guide says: Change from 1.5 to 1.8 in NfSenRRD.pm
-# Also fix install.pl's own version check (separate from NfSenRRD.pm)
+# Also fix install.pl's own version check - WARNING: NO inline comments here!
+# In /bin/sh, # comments break continuation lines! Use echo instead.
 # ===========================================================================
 RUN cd /tmp/nfsen-1.3.6p1 \
-    # Fix NfSenRRD.pm: change 1.5|1.6 to 1.8 (as guide says) \
+    && echo "[STEP 11] Fixing NfSenRRD.pm 1.5->1.8..." \
     && sed -i 's/1\.[56]/1.8/g' libexec/NfSenRRD.pm \
-    # Fix install.pl: disable exit calls and delete error msg \
+    && echo "[STEP 11] Fixing install.pl exit calls..." \
     && sed -i 's/exit 2;/# exit 2;/g' install.pl \
-    && sed -i '/not yet supported/d' install.pl
+    && sed -i '/not yet supported/d' install.pl \
+    && echo "[STEP 11] Version checks patched"
 
 # ===========================================================================
 # STEP 12: Configure nfsen.conf with our settings
