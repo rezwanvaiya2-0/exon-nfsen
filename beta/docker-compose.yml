@@ -1,0 +1,33 @@
+services:
+  nfsen:
+    build: .
+    container_name: exon-nfsen
+    hostname: nfsen
+    restart: unless-stopped
+    ports:
+      - "8070:8070"
+      - "2055:2055/udp"
+    volumes:
+      - nfsen-data:/var/nfsen/profiles-data
+      - nfsen-stat:/var/nfsen/profiles-stat
+      - nfsen-var:/var/nfsen/var
+    environment:
+      - TZ=Asia/Dhaka
+      - NFSEN_SOURCES=2055:exonhost_microtik:#0000ff
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      - nfsen-net
+
+volumes:
+  nfsen-data:
+    driver: local
+  nfsen-stat:
+    driver: local
+  nfsen-var:
+    driver: local
+
+networks:
+  nfsen-net:
+    driver: bridge
