@@ -114,7 +114,11 @@ COPY config/nfsen.conf /tmp/nfsen-1.3.6p1/etc/nfsen.conf
 # STEP 13: Install nfsen (guide: ./install.pl ./etc/nfsen.conf)
 # ===========================================================================
 WORKDIR /tmp/nfsen-1.3.6p1
-RUN ./install.pl ./etc/nfsen.conf
+RUN ./install.pl ./etc/nfsen.conf \
+    && echo "[STEP 13] install.pl completed" \
+    && ls -la /var/nfsen/www/nfsen.php 2>/dev/null \
+        && echo "[STEP 13] nfsen.php exists" \
+        || { echo "[STEP 13 ERROR] nfsen.php NOT FOUND after install.pl!"; exit 1; }
 
 # ===========================================================================
 # STEP 14: Set up Apache (guide: virtual host, ports 8070, apache2.conf)
