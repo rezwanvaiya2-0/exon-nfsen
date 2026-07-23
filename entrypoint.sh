@@ -35,10 +35,10 @@ if [ -n "$NFSEN_SOURCES" ] && [ "$NFSEN_SOURCES" != "2055:exonhost_microtik:#000
 fi
 
 # ---------------------------------------------------------------------------
-# Create symlink (guide: ln -s /var/nfsen/www/ /var/www/html/nfsen)
+# Create symlink (guide: DocumentRoot /var/www/nfsen)
 # ---------------------------------------------------------------------------
-mkdir -p /var/www/html
-ln -sf /var/nfsen/www /var/www/html/nfsen 2>/dev/null || true
+mkdir -p /var/www
+ln -sf /var/nfsen/www /var/www/nfsen 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # Ensure required directories exist

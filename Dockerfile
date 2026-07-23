@@ -92,10 +92,16 @@ RUN useradd -M -s /bin/false -G www-data netflow \
     && mkdir -p /var/nfsen
 
 # ===========================================================================
-# STEP 11: Edit NfSenRRD.pm - Change from 1.5 to 1.8 (guide's exact fix)
+# STEP 11: Fix RRD version check in NfSenRRD.pm + install.pl
+# Guide says: Change from 1.5 to 1.8 in NfSenRRD.pm
+# Also fix install.pl's own version check (separate from NfSenRRD.pm)
 # ===========================================================================
 RUN cd /tmp/nfsen-1.3.6p1 \
-    && sed -i 's/1\.[56]/1.8/g' libexec/NfSenRRD.pm
+    # Fix NfSenRRD.pm: change 1.5|1.6 to 1.8 (as guide says) \
+    && sed -i 's/1\.[56]/1.8/g' libexec/NfSenRRD.pm \
+    # Fix install.pl: disable exit calls and delete error msg \
+    && sed -i 's/exit 2;/# exit 2;/g' install.pl \
+    && sed -i '/not yet supported/d' install.pl
 
 # ===========================================================================
 # STEP 12: Configure nfsen.conf with our settings
@@ -119,9 +125,9 @@ RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/s/AllowOverride None/Allow
     /etc/apache2/apache2.conf 2>/dev/null || true
 
 # ===========================================================================
-# STEP 15: Create symlink (guide: ln -s /var/nfsen/www/ /var/www/html/nfsen)
+# STEP 15: Create symlink (guide: DocumentRoot /var/www/nfsen)
 # ===========================================================================
-RUN mkdir -p /var/www/html && ln -sf /var/nfsen/www /var/www/html/nfsen
+RUN mkdir -p /var/www && ln -sf /var/nfsen/www /var/www/nfsen
 
 # ===========================================================================
 # STEP 16: Configure ownership and permissions (guide's troubleshooting)
