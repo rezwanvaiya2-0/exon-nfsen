@@ -18,13 +18,15 @@ Timezone: **Asia/Dhaka**
 
 ## Adding a Router Source
 
+> **Note:** After modifying the config, run `nfsen reconfig` to apply changes **without** restarting the daemon. This is preferred over `nfsen restart` as it avoids disrupting active data collection. If the changes don't appear, try a full restart instead.
+
 Replace `NAME`, `IP`, `PORT`, and `COLOR` with your values:
 
 ```bash
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
 sed -i "/^);$/i\    'NAME' => { 'port' => 'PORT', 'IP' => 'IP_ADDRESS', 'col' => '#COLOR', 'type' => 'netflow' }," /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
-docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
+docker exec exon-nfsen /var/nfsen/bin/nfsen reconfig && \
 echo "✓ Done"
 ```
 
@@ -34,7 +36,7 @@ echo "✓ Done"
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
 sed -i "/^);$/i\    'router1' => { 'port' => '2055', 'IP' => '103.159.36.253', 'col' => '#32CD32', 'type' => 'netflow' }," /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
-docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
+docker exec exon-nfsen /var/nfsen/bin/nfsen reconfig && \
 echo "✓ Done"
 ```
 
@@ -44,17 +46,19 @@ echo "✓ Done"
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
 sed -i "/^);$/i\    'NAME' => { 'port' => 'PORT', 'col' => '#COLOR', 'type' => 'netflow' }," /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
-docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
+docker exec exon-nfsen /var/nfsen/bin/nfsen reconfig && \
 echo "✓ Done"
 ```
 
 ## Removing a Router Source
 
+> **Note:** After removing a source, run `nfsen reconfig` to apply the changes without a full restart.
+
 ```bash
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
 sed -i "/'ROUTERNAME' =>/d" /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
-docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
+docker exec exon-nfsen /var/nfsen/bin/nfsen reconfig && \
 echo "✓ Removed"
 ```
 
@@ -63,7 +67,7 @@ Example:
 docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
 sed -i "/'router1' =>/d" /tmp/nfsen.conf && \
 docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
-docker exec exon-nfsen /var/nfsen/bin/nfsen restart && \
+docker exec exon-nfsen /var/nfsen/bin/nfsen reconfig && \
 echo "✓ Removed"
 ```
 
@@ -110,6 +114,7 @@ docker-compose down && docker-compose up -d
 | Problem | Fix |
 |---|---|
 | Web UI shows `nfsend connect() error` | `docker exec exon-nfsen /var/nfsen/bin/nfsen restart` |
+| Config changes not showing after reconfig | `docker exec exon-nfsen /var/nfsen/bin/nfsen restart` (full restart if reconfig didn't work) |
 | Port already in use | Change Apache port in `docker-compose.yml` |
 | Can't access port 8070 | Check firewall: `ufw allow 8070/tcp` |
 | NfSen not starting | `docker logs exon-nfsen --tail 30` |
