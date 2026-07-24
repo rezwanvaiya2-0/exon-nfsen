@@ -105,6 +105,8 @@ RUN cd /tmp/nfsen-1.3.6p1 \
     && sed -i '/not yet supported/d' install.pl \
     && echo "[STEP 11] Fixing Nfsync.pm semaphore die -> warn..." \
     && sed -i 's/|| die "Can not get semaphore/|| warn "Can not get semaphore/g' libexec/Nfsync.pm \
+    && echo "[STEP 11] Fixing NfSen.pm UserInput for non-interactive reconfig..." \
+    && sed -i '/$answer = <STDIN>;/a\        if (!defined($answer)) { $answer = "y"; }' libexec/NfSen.pm \
     && echo "[STEP 11] Version checks patched"
 
 # ===========================================================================
