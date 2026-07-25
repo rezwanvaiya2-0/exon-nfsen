@@ -67,6 +67,8 @@ echo "[OK] Apache started."
 # ---------------------------------------------------------------------------
 echo "[INFO] Starting NfSen..."
 if [ -f "${NFSEN_BASEDIR}/bin/nfsen" ]; then
+    # Run reconfig first to sync config with existing data directories
+    ${NFSEN_BASEDIR}/bin/nfsen reconfig 2>&1 || echo "[WARN] nfsen reconfig failed"
     ${NFSEN_BASEDIR}/bin/nfsen start 2>&1 || echo "[WARN] nfsen start failed"
     sleep 2
     if [ -f "${NFSEN_BASEDIR}/var/run/nfsend.pid" ]; then
