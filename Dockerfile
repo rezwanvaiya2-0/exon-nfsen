@@ -125,7 +125,15 @@ RUN ./install.pl ./etc/nfsen.conf \
         || { echo "[STEP 13 ERROR] nfsen.php NOT FOUND after install.pl!"; exit 1; }
 
 # ===========================================================================
-# STEP 14: Set up Apache (guide: virtual host, ports 8070, apache2.conf)
+# STEP 14: Add restart command (missing from nfsen by default)
+# ===========================================================================
+RUN echo "[STEP 14] Adding restart command to nfsen..." && \
+    perl -i -pe 'END { print qq(sub NfSen_restart {\n    NfSen_stop();\n    NfSen_start();\n}\n) }' /var/nfsen/libexec/NfSenRC.pm && \
+    sed -i "/'start' => { 'nfsend' => 0, 'run' => .*NfSenRC::NfSen_start/a\    'restart' => { 'nfsend' => 0, 'run' => \&NfSenRC::NfSen_restart, 'RunAsRoot' => 1, 'rc_command' => 1 }," /var/nfsen/bin/nfsen && \
+    echo "[STEP 14] restart command added"
+
+# ===========================================================================
+# STEP 15: Set up Apache (guide: virtual host, ports 8070, apache2.conf)
 # ===========================================================================
 COPY config/000-default.conf /etc/apache2/sites-available/000-default.conf
 COPY config/ports.conf /etc/apache2/ports.conf
@@ -135,7 +143,7 @@ RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/s/AllowOverride None/Allow
     /etc/apache2/apache2.conf 2>/dev/null || true
 
 # ===========================================================================
-# STEP 15: Configure ownership and permissions (guide's troubleshooting)
+# STEP 16: Configure ownership and permissions (guide's troubleshooting)
 # ===========================================================================
 RUN chown -R www-data:www-data /var/nfsen && \
     chown -R netflow:www-data /var/nfsen/profiles-data/live/ 2>/dev/null || true && \
@@ -143,12 +151,12 @@ RUN chown -R www-data:www-data /var/nfsen && \
     chmod 777 /var/nfsen/var/run 2>/dev/null || true
 
 # ===========================================================================
-# STEP 16: Make nfsen reboot proof (guide: init.d symlink)
+# STEP 17: Make nfsen reboot proof (guide: init.d symlink)
 # ===========================================================================
 RUN ln -sf /var/nfsen/bin/nfsen /etc/init.d/nfsen
 
 # ===========================================================================
-# STEP 17: Copy entrypoint
+# STEP 18: Copy entrypoint
 # ===========================================================================
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
