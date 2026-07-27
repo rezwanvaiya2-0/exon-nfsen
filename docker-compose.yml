@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     ports:
       - "8070:8070"
-      - "2055:2055/udp"
+      - "2055-3055:2055-3055/udp"
     volumes:
       - nfsen-data:/var/nfsen/profiles-data
       - nfsen-stat:/var/nfsen/profiles-stat

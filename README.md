@@ -10,9 +10,13 @@ cd exon-nfsen
 docker-compose up -d --build
 ```
 
+> **`--build` is only needed on the first run.** After that, restarting the container only requires `docker-compose down && docker-compose up -d` (no `--build`). Your sources, config, and data all persist thanks to Docker volumes.
+
 Access: **http://\<YOUR_IP\>:8070/nfsen.php**
 
 Timezone: **Asia/Dhaka**
+
+> **No rebuild needed for new routers!** The container exposes a UDP port range `2055–3055`, so you can add up to 1000+ router sources without ever modifying `docker-compose.yml` or rebuilding. Just use `docker exec` to add a source (see [Managing Router Sources](#managing-router-sources)).
 
 ---
 
@@ -120,28 +124,25 @@ If you add a source with an IP while existing sources lack one, the command will
 
 ---
 
-## Port Exposing
+## Port Range — No Rebuild Needed for New Sources
 
-If you use a port other than `2055`, update `docker-compose.yml`:
+`docker-compose.yml` exposes a **UDP port range `2055–3055`** (1000+ ports), so you can add up to **1000+ routers** on different ports without ever rebuilding the project.
 
-```yaml
-ports:
-  - "8070:8070"
-  - "2055:2055/udp"
-  - "2056:2056/udp"
-```
+### Adding a new router source (example: port 2056):
 
-Then restart:
 ```bash
-docker-compose down && docker-compose up -d
+docker exec exon-nfsen bash -c "sed -i \"/^);\$/i\\    'router2' => { 'port' => '2056', 'col' => '#32CD32', 'type' => 'netflow' },\" /var/nfsen/etc/nfsen.conf && /var/nfsen/bin/nfsen reconfig && echo '✓ Done'"
 ```
+
+That's it! No compose edits, no rebuild. The port is already exposed by the range.
 
 ---
 
 ## Notes
 
-- Config changes persist as long as the container exists
-- Rebuilding the image resets config — re-run the add commands
+- **Port range 2055–3055** is pre-exposed — no need to touch `docker-compose.yml` for new routers
+- Config changes persist as long as the container exists (via Docker volumes)
+- Rebuilding the image resets nfsen.conf — re-run the add commands
 - NetFlow data in Docker volumes survives rebuilds
 
 ## Troubleshooting
