@@ -145,15 +145,145 @@ That's it! No compose edits, no rebuild. The port is already exposed by the rang
 - Rebuilding the image resets nfsen.conf — re-run the add commands
 - NetFlow data in Docker volumes survives rebuilds
 
+---
+
+## 🔥 Storage Full — Recover Disk Space
+
+NfSen's NetFlow capture files accumulate quickly. When your VPS disk fills up (100%), `docker exec` commands will fail with:
+
+```
+OCI runtime exec failed: write /tmp/runc-processXXXXXX: no space left on device
+```
+
+And `nfsen stop` will fail because the Unix socket can't be written to:
+```
+setlogsock(): type='unix': path not available
+```
+
+Don't worry — here's how to recover:
+
+### Step 1: Free a few MB to get Docker working again
+
+Run these **host-level** commands (no `docker exec` needed):
+
+```bash
+docker system prune -f
+docker builder prune -f
+```
+
+If that's not enough, also clean system logs:
+```bash
+sudo journalctl --vacuum-time=1d
+sudo rm -f /var/log/syslog.1 /var/log/kern.log.1 2>/dev/null; true
+```
+
+Check if you have enough space now:
+```bash
+df -h /
+```
+
+> You only need **~50MB free** for `docker exec` to work again.
+
+---
+
+### Step 2: Stop everything and delete the data
+
+**Method A — Quick (if `docker stop` works):**
+
+```bash
+# Stop the entire container (always works — doesn't need the nfsen socket)
+docker stop exon-nfsen
+
+# Delete the flow data directly from Docker volumes
+rm -rf /var/lib/docker/volumes/exon-nfsen_nfsen-data/_data/live/*
+rm -rf /var/lib/docker/volumes/exon-nfsen_nfsen-stat/_data/live/*
+rm -rf /var/lib/docker/volumes/exon-nfsen_nfsen-var/_data/*
+
+# Start fresh
+docker start exon-nfsen
+```
+
+**Method B — Via docker exec (if you already freed some space):**
+
+```bash
+# Delete the captured flow data (this frees the most space)
+docker exec exon-nfsen bash -c "rm -rf /var/nfsen/profiles-data/live/* /var/nfsen/profiles-stat/live/*"
+
+# Truncate logs too
+docker exec exon-nfsen bash -c "truncate -s 0 /var/nfsen/var/nfsen.log"
+```
+
+---
+
+### Step 3: Restart NfSen
+
+If `docker stop/start` was used (Method A), the container handles this automatically.
+
+If you used `docker exec` to delete (Method B), run:
+
+```bash
+# Use the force-restart script (no rebuild needed)
+bash nfsen-force-restart.sh
+```
+
+Or manually:
+```bash
+# Force-kill stale daemon if socket is broken
+docker exec exon-nfsen bash -c "\
+  pkill -f nfsend 2>/dev/null; sleep 1; \
+  rm -f /var/nfsen/var/run/nfsen.comm /var/nfsen/var/run/nfsend.pid; \
+  /var/nfsen/bin/nfsen reconfig; \
+  /var/nfsen/bin/nfsen start\
+"
+```
+
+---
+
+### Verify recovery
+
+```bash
+# Check disk space
+df -h /
+
+# Check NfSen status
+docker exec exon-nfsen /var/nfsen/bin/nfsen status
+
+# Access Web UI: http://<YOUR_IP>:8070/nfsen.php
+```
+
+---
+
+### ⚠️ Prevent this from happening again
+
+NfSen accumulates data fast. To limit storage usage, add a data retention policy:
+
+```bash
+# Configure NfSen to keep only 7 days of data
+docker exec exon-nfsen bash -c "echo '\$profiletimout = 7;' >> /var/nfsen/etc/nfsen.conf && /var/nfsen/bin/nfsen reconfig"
+```
+
+Or **set up a cron job** to auto-delete old data:
+
+```bash
+docker exec exon-nfsen bash -c "\
+  (crontab -l 2>/dev/null; echo '0 3 * * * find /var/nfsen/profiles-data -type f -mtime +7 -delete') | crontab -\
+"
+```
+
+> You can change `+7` to any number of days. Higher = more data kept, more disk used.
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| Web UI shows `nfsend connect() error` | `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` |
+| Web UI shows `nfsend connect() error` | `bash nfsen-force-restart.sh` or `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` |
 | Config changes not showing after reconfig | `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` (full restart if reconfig didn't work) |
 | `Error: missing parameter 'IP' for multiple sources collector` | Add `'IP' => '0.0.0.0'` to all existing sources manually. See [IP Requirement](#-important-ip-requirement-for-multiple-sources) |
 | `Reconfig: No changes found!` | The source name doesn't exist — check with `docker exec exon-nfsen grep -A 20 '%sources' /var/nfsen/etc/nfsen.conf` |
 | `Command 'sed' not found` | Your host lacks `sed`. Use the **Docker exec** method instead (no host tools needed). See [Remove a source](#remove-a-source) |
 | Port already in use | Change Apache port in `docker-compose.yml` |
 | Can't access port 8070 | Check firewall: `ufw allow 8070/tcp` |
-| NfSen not starting | `docker logs exon-nfsen --tail 30` |
+| NfSen not starting | `docker logs exon-nfsen --tail 30` and then `bash nfsen-force-restart.sh` |
+| `nfsend connect() error` after disk full | Socket is dead. Run `bash nfsen-force-restart.sh` to force-kill and restart |

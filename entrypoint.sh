@@ -67,6 +67,16 @@ echo "[OK] Apache started."
 # ---------------------------------------------------------------------------
 echo "[INFO] Starting NfSen..."
 if [ -f "${NFSEN_BASEDIR}/bin/nfsen" ]; then
+    # Kill any stale nfsend process left from a previous crash/disk-full
+    # This is critical: when disk was full, nfsen stop fails (socket dead),
+    # leaving an orphaned daemon that blocks a fresh start.
+    pkill -f nfsend 2>/dev/null || true
+    sleep 1
+
+    # Remove stale socket/PID files in case kill didn't clean them
+    rm -f "${NFSEN_BASEDIR}/var/run/nfsen.comm" 2>/dev/null || true
+    rm -f "${NFSEN_BASEDIR}/var/run/nfsend.pid" 2>/dev/null || true
+
     # Run reconfig first to sync config with existing data directories
     ${NFSEN_BASEDIR}/bin/nfsen reconfig 2>&1 || echo "[WARN] nfsen reconfig failed"
     ${NFSEN_BASEDIR}/bin/nfsen start 2>&1 || echo "[WARN] nfsen start failed"
@@ -98,7 +108,8 @@ echo "  Web UI: http://<YOUR_IP>:8070/nfsen.php"
 echo "========================================================================="
 
 # Trap for graceful shutdown
-trap 'echo "Shutting down..."; ${NFSEN_BASEDIR}/bin/nfsen stop 2>/dev/null; apache2ctl stop; exit 0' SIGTERM SIGINT
+# Try nfsen stop first; if socket is dead (disk full / crash), force-kill the process
+trap 'echo "Shutting down..."; ${NFSEN_BASEDIR}/bin/nfsen stop 2>/dev/null || { pkill -f nfsend 2>/dev/null; rm -f ${NFSEN_BASEDIR}/var/run/nfsend.pid ${NFSEN_BASEDIR}/var/run/nfsen.comm; }; apache2ctl stop; exit 0' SIGTERM SIGINT
 
 # Keep container running
 exec tail -f /var/log/apache2/error.log \
