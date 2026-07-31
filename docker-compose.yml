@@ -20,6 +20,9 @@ services:
       - nfsen-data:/var/nfsen/profiles-data
       - nfsen-stat:/var/nfsen/profiles-stat
       - nfsen-var:/var/nfsen/var
+      # nfsen.conf lives here - so router sources added via `docker exec`
+      # persist forever (restarts, recreates, even rebuilds). No env vars needed.
+      - nfsen-etc:/var/nfsen/etc
     environment:
       - TZ=Asia/Dhaka
       # The container starts with NO router sources - add yours here when you
@@ -37,6 +40,8 @@ volumes:
   nfsen-stat:
     driver: local
   nfsen-var:
+    driver: local
+  nfsen-etc:
     driver: local
 
 networks:

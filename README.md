@@ -123,12 +123,13 @@ nano docker-compose.yml
       - "2070:2070/udp"      # <- new router port
 ```
 
-3. Add the source to `NFSEN_SOURCES` (the container configures it automatically on every start):
+3. Add the router source — `docker exec` is the recommended way, and it now **persists forever** (see note below):
 
-```yaml
-    environment:
-      - NFSEN_SOURCES=2070:myrouter:#FF0000
+```bash
+docker exec exon-nfsen bash -c "sed -i \"/^);$/i\\    'myrouter' => { 'port' => '2070', 'col' => '#FF0000', 'type' => 'netflow' },\" /var/nfsen/etc/nfsen.conf && /var/nfsen/bin/nfsen reconfig && echo '✓ Done'"
 ```
+
+> Prefer the env var? You can set `NFSEN_SOURCES=2070:myrouter:#FF0000` in `docker-compose.yml` instead — but pick **one** method, don't mix.
 
 4. Recreate the container — done:
 
@@ -147,10 +148,11 @@ That's it: the port opens **and** the router source is configured automatically.
 ## Notes
 
 - **UDP ports 2055 and 2056** are pre-opened — add more in `docker-compose.yml` as needed (see [Adding a Router on a New Port](#adding-a-router-on-a-new-port))
-- Sources defined in `NFSEN_SOURCES` are configured automatically on every container start — so manage ALL your sources there (`docker exec` additions get overwritten on restart)
-- Rebuilding the image resets nfsen.conf — re-run the add commands
+- **Router sources added via `docker exec` now persist forever** — `nfsen.conf` lives in a Docker volume (`nfsen-etc`), so it survives restarts, recreates, and even rebuilds. No env vars needed.
+- The `NFSEN_SOURCES` env var is **optional** — use it only if you prefer managing sources in `docker-compose.yml` instead of `docker exec`
 - NetFlow data in Docker volumes survives rebuilds and recreates
-- ⚠️ Only `docker compose down -v` deletes data — never add `-v` unless you want a fresh start
+- ⚠️ Only `docker compose down -v` deletes data and router sources — never add `-v` unless you want a fresh start
+- ⚠️ The `nfsen-etc` volume is seeded from the image only on the **first** start — if you later change `config/nfsen.conf` in the repo, update it inside the container too (or delete the volume)
 
 ---
 
