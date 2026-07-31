@@ -22,26 +22,14 @@ Timezone: **Asia/Dhaka**
 
 ## Managing Router Sources
 
-> ⚠️ **Host `sed` may not be installed!** If you get `Command 'sed' not found`, use the **`docker exec` method** instead (no host tools needed).
-
 ### Add a source with IP
 
-#### Method 1: Docker exec (recommended — works on any host)
+#### Docker exec (recommended)
 
 Replace `NAME`, `IP_ADDRESS`, and `COLOR` with your values:
 
 ```bash
 docker exec exon-nfsen bash -c "sed -i \"/^);$/i\\    'NAME' => { 'port' => '2055', 'IP' => 'IP_ADDRESS', 'col' => '#COLOR', 'type' => 'netflow' },\" /var/nfsen/etc/nfsen.conf && /var/nfsen/bin/nfsen reconfig && echo '✓ Done'"
-```
-
-#### Method 2: Docker cp (uses host sed)
-
-```bash
-docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
-sed -i "/^);$/i\\    'NAME' => { 'port' => '2055', 'IP' => 'IP_ADDRESS', 'col' => '#COLOR', 'type' => 'netflow' }," /tmp/nfsen.conf && \
-docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
-docker exec exon-nfsen /var/nfsen/bin/nfsen reconfig && \
-echo "✓ Done"
 ```
 
 > ⚠️ **If you have existing sources without IP, this will fail!** You must first add `'IP' => '0.0.0.0'` to all existing sources before adding a new one with an IP.
@@ -50,25 +38,13 @@ echo "✓ Done"
 
 ### Remove a source
 
-#### Method 1: Docker exec (recommended — works on any host)
+#### Docker exec (recommended)
 
 Replace `NAME` with your source name (e.g., `router1`):
 
 ```bash
 docker exec exon-nfsen bash -c "sed -i \"/'NAME' =>/d\" /var/nfsen/etc/nfsen.conf && /var/nfsen/bin/nfsen reconfig && echo '✓ Removed'"
 ```
-
-#### Method 2: Docker cp (uses host sed)
-
-```bash
-docker cp exon-nfsen:/var/nfsen/etc/nfsen.conf /tmp/nfsen.conf && \
-sed -i "/'ROUTERNAME' =>/d" /tmp/nfsen.conf && \
-docker cp /tmp/nfsen.conf exon-nfsen:/var/nfsen/etc/nfsen.conf && \
-docker exec exon-nfsen /var/nfsen/bin/nfsen reconfig && \
-echo "✓ Removed"
-```
-
-> ⚠️ **No trailing space after `\`!** The backslash must be the very last character on the line. A space after `\` will break the command chain.
 
 ---
 
@@ -287,7 +263,6 @@ docker exec exon-nfsen bash -c "\
 | Config changes not showing after reconfig | `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` (full restart if reconfig didn't work) |
 | `Error: missing parameter 'IP' for multiple sources collector` | Add `'IP' => '0.0.0.0'` to all existing sources manually. See [IP Requirement](#-important-ip-requirement-for-multiple-sources) |
 | `Reconfig: No changes found!` | The source name doesn't exist — check with `docker exec exon-nfsen grep -A 20 '%sources' /var/nfsen/etc/nfsen.conf` |
-| `Command 'sed' not found` | Your host lacks `sed`. Use the **Docker exec** method instead (no host tools needed). See [Remove a source](#remove-a-source) |
 | Port already in use | Change Apache port in `docker-compose.yml` |
 | Can't access port 8070 | Check firewall: `ufw allow 8070/tcp` |
 | NfSen not starting | `docker logs exon-nfsen --tail 30`, then `docker restart exon-nfsen` |
