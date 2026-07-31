@@ -16,7 +16,60 @@ Access: **http://\<YOUR_IP\>:8070/nfsen.php**
 
 Timezone: **Asia/Dhaka**
 
-> **No rebuild needed for new routers!** The container exposes a UDP port range `2055–3055`, so you can add up to 1000+ router sources without ever modifying `docker-compose.yml` or rebuilding. Just use `docker exec` to add a source (see [Managing Router Sources](#managing-router-sources)).
+> **No rebuild needed for new routers!** The container exposes a UDP port range `2055–3000`, so you can add up to 900+ router sources without ever modifying `docker-compose.yml` or rebuilding. Just use `docker exec` to add a source (see [Managing Router Sources](#managing-router-sources)).
+
+---
+
+## 🚀 Performance Fixes (slow start / high RAM & CPU)
+
+Symptom: container stuck in `Starting` for 60–90s, image build taking ~7 min, and the VPS eating RAM/CPU. This repo now ships three fixes:
+
+### 1. Slow container start (the 84s `Starting`)
+
+Two causes, both fixed:
+
+- **Recursive `chown`/`chmod` on every boot** — the old entrypoint ran `chown -R` / `chmod -R` over the whole `/var/nfsen`, including gigabytes of captured flow data in the volumes. That's 60s+ of pure CPU/IO per start. The entrypoint now only does the full pass on the **first start** (when volumes are empty) and skips it afterwards — files keep correct ownership between restarts.
+- **Healthcheck `start-period: 60s`** — Docker/Compose shows `Starting` until the container is *healthy*, so a 60s grace period means a guaranteed 60s wait. Reduced to **15s**.
+
+Now the container is healthy in **~15–20s** instead of 84s. **No need to delete your data** — just rebuild once:
+
+```bash
+docker-compose down
+docker-compose up -d --build
+```
+
+> ⚠️ Because the build itself was also changed (parallel `make -j`), the **first rebuild recompiles nfdump once** — expect 3–5 min instead of 7. After that single rebuild, every later `docker-compose up -d` (no `--build`) uses the cache and starts in seconds.
+
+### 2. High RAM/CPU after start (the VPS resource hog)
+
+The UDP range `2055–3000` = **946 published ports**. Docker's default userland proxy spawns **one `docker-proxy` process per port** → ~946 idle processes eating RAM and CPU even when NfSen does nothing.
+
+Optional fix (host-level, one time) — disable the userland proxy so forwarding is done by kernel iptables with **zero extra processes**. Edit `/etc/docker/daemon.json` on the VPS:
+
+```json
+{
+  "userland-proxy": false
+}
+```
+
+Then restart Docker: `sudo systemctl restart docker`. Verify with `ps aux | grep -c docker-proxy` (should be `0`).
+
+> Note: this is purely optional. The container runs fine either way — without it you simply have one small idle process per published port.
+
+### 3. Slow image build (~412s)
+
+The nfdump source compile is now parallelized (`make -j$(nproc)`) so fresh builds are **2–4× faster**. And for a brand-new VPS, the fastest path is to **push the image once and pull it there** instead of recompiling:
+
+```bash
+# On the current VPS (after the rebuild above)
+docker tag exon-nfsen:latest yourdockerhubuser/exon-nfsen:latest
+docker push yourdockerhubuser/exon-nfsen:latest
+
+# On the new VPS — pull instead of build
+docker pull yourdockerhubuser/exon-nfsen:latest
+```
+
+> After the very first build, `docker-compose up -d` (no `--build`) reuses the cached image and starts in seconds.
 
 ---
 
@@ -126,7 +179,7 @@ If you add a source with an IP while existing sources lack one, the command will
 
 ## Port Range — No Rebuild Needed for New Sources
 
-`docker-compose.yml` exposes a **UDP port range `2055–3055`** (1000+ ports), so you can add up to **1000+ routers** on different ports without ever rebuilding the project.
+`docker-compose.yml` exposes a **UDP port range `2055–3000`** (900+ ports), so you can add up to **900+ routers** on different ports without ever rebuilding the project.
 
 ### Adding a new router source (example: port 2056):
 
@@ -140,7 +193,7 @@ That's it! No compose edits, no rebuild. The port is already exposed by the rang
 
 ## Notes
 
-- **Port range 2055–3055** is pre-exposed — no need to touch `docker-compose.yml` for new routers
+- **Port range 2055–3000** is pre-exposed — no need to touch `docker-compose.yml` for new routers
 - Config changes persist as long as the container exists (via Docker volumes)
 - Rebuilding the image resets nfsen.conf — re-run the add commands
 - NetFlow data in Docker volumes survives rebuilds
@@ -219,14 +272,8 @@ docker exec exon-nfsen bash -c "truncate -s 0 /var/nfsen/var/nfsen.log"
 
 If `docker stop/start` was used (Method A), the container handles this automatically.
 
-If you used `docker exec` to delete (Method B), run:
+If you used `docker exec` to delete (Method B), restart NfSen manually:
 
-```bash
-# Use the force-restart script (no rebuild needed)
-bash nfsen-force-restart.sh
-```
-
-Or manually:
 ```bash
 # Force-kill stale daemon if socket is broken
 docker exec exon-nfsen bash -c "\
@@ -236,6 +283,8 @@ docker exec exon-nfsen bash -c "\
   /var/nfsen/bin/nfsen start\
 "
 ```
+
+Or simply restart the whole container: `docker restart exon-nfsen`.
 
 ---
 
@@ -278,12 +327,12 @@ docker exec exon-nfsen bash -c "\
 
 | Problem | Fix |
 |---|---|
-| Web UI shows `nfsend connect() error` | `bash nfsen-force-restart.sh` or `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` |
+| Web UI shows `nfsend connect() error` | `docker restart exon-nfsen`, or `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` |
 | Config changes not showing after reconfig | `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` (full restart if reconfig didn't work) |
 | `Error: missing parameter 'IP' for multiple sources collector` | Add `'IP' => '0.0.0.0'` to all existing sources manually. See [IP Requirement](#-important-ip-requirement-for-multiple-sources) |
 | `Reconfig: No changes found!` | The source name doesn't exist — check with `docker exec exon-nfsen grep -A 20 '%sources' /var/nfsen/etc/nfsen.conf` |
 | `Command 'sed' not found` | Your host lacks `sed`. Use the **Docker exec** method instead (no host tools needed). See [Remove a source](#remove-a-source) |
 | Port already in use | Change Apache port in `docker-compose.yml` |
 | Can't access port 8070 | Check firewall: `ufw allow 8070/tcp` |
-| NfSen not starting | `docker logs exon-nfsen --tail 30` and then `bash nfsen-force-restart.sh` |
-| `nfsend connect() error` after disk full | Socket is dead. Run `bash nfsen-force-restart.sh` to force-kill and restart |
+| NfSen not starting | `docker logs exon-nfsen --tail 30`, then `docker restart exon-nfsen` |
+| `nfsend connect() error` after disk full | Socket is dead. Restart the container: `docker restart exon-nfsen` |

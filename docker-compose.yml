@@ -1,12 +1,15 @@
 services:
   nfsen:
+    # image name lets you docker push / docker pull instead of rebuilding
+    # (~7 min source compile) on every new VPS
+    image: exon-nfsen:latest
     build: .
     container_name: exon-nfsen
     hostname: nfsen
     restart: unless-stopped
     ports:
       - "8070:8070"
-      - "2055-3055:2055-3055/udp"
+      - "2055-3000:2055-3000/udp"
     volumes:
       - nfsen-data:/var/nfsen/profiles-data
       - nfsen-stat:/var/nfsen/profiles-stat

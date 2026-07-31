@@ -65,7 +65,7 @@ RUN sh ./autogen.sh \
         --enable-nfpcapd \
         --enable-nftrack \
         --enable-jnat \
-    && make && make install
+    && make -j"$(nproc)" && make install
 
 # ===========================================================================
 # STEP 7: Install Perl modules (guide: cpanm)
@@ -172,8 +172,9 @@ RUN rm -rf /tmp/nfdump-1.6.17* /tmp/nfsen-1.3.6p1* /tmp/v1.6.17* /tmp/nfsen.tar.
 EXPOSE 8070
 EXPOSE 2055/udp
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Health check — short start-period now that the entrypoint boots in seconds
+# (a 60s start-period kept the container in "Starting" state for a full minute)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8070/nfsen.php || exit 1
 
 # ===========================================================================
