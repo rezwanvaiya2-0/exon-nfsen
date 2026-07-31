@@ -20,59 +20,6 @@ Timezone: **Asia/Dhaka**
 
 ---
 
-## 🚀 Performance Fixes (slow start / high RAM & CPU)
-
-Symptom: container stuck in `Starting` for 60–90s, image build taking ~7 min, and the VPS eating RAM/CPU. This repo now ships three fixes:
-
-### 1. Slow container start (the 84s `Starting`)
-
-Two causes, both fixed:
-
-- **Recursive `chown`/`chmod` on every boot** — the old entrypoint ran `chown -R` / `chmod -R` over the whole `/var/nfsen`, including gigabytes of captured flow data in the volumes. That's 60s+ of pure CPU/IO per start. The entrypoint now only does the full pass on the **first start** (when volumes are empty) and skips it afterwards — files keep correct ownership between restarts.
-- **Healthcheck `start-period: 60s`** — Docker/Compose shows `Starting` until the container is *healthy*, so a 60s grace period means a guaranteed 60s wait. Reduced to **15s**.
-
-Now the container is healthy in **~15–20s** instead of 84s. **No need to delete your data** — just rebuild once:
-
-```bash
-docker-compose down
-docker-compose up -d --build
-```
-
-> ⚠️ Because the build itself was also changed (parallel `make -j`), the **first rebuild recompiles nfdump once** — expect 3–5 min instead of 7. After that single rebuild, every later `docker-compose up -d` (no `--build`) uses the cache and starts in seconds.
-
-### 2. High RAM/CPU after start (the VPS resource hog)
-
-The UDP range `2055–2099` = **45 published ports**. Docker's default userland proxy spawns **one `docker-proxy` process per port** → 45 idle processes eating RAM and CPU even when NfSen does nothing.
-
-Optional fix (host-level, one time) — disable the userland proxy so forwarding is done by kernel iptables with **zero extra processes**. Edit `/etc/docker/daemon.json` on the VPS:
-
-```json
-{
-  "userland-proxy": false
-}
-```
-
-Then restart Docker: `sudo systemctl restart docker`. Verify with `ps aux | grep -c docker-proxy` (should be `0`).
-
-> Note: this is purely optional. The container runs fine either way — without it you simply have one small idle process per published port.
-
-### 3. Slow image build (~412s)
-
-The nfdump source compile is now parallelized (`make -j$(nproc)`) so fresh builds are **2–4× faster**. And for a brand-new VPS, the fastest path is to **push the image once and pull it there** instead of recompiling:
-
-```bash
-# On the current VPS (after the rebuild above)
-docker tag exon-nfsen:latest yourdockerhubuser/exon-nfsen:latest
-docker push yourdockerhubuser/exon-nfsen:latest
-
-# On the new VPS — pull instead of build
-docker pull yourdockerhubuser/exon-nfsen:latest
-```
-
-> After the very first build, `docker-compose up -d` (no `--build`) reuses the cached image and starts in seconds.
-
----
-
 ## ⚠️ First Time Setup: Remove Default Source
 
 The container comes with a **default source** `exonhost_microtik` listening on port **2055**. Before you can add your own routers, you **must remove this default source** first.
