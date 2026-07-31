@@ -58,7 +58,7 @@ RUN wget -q --retry-connrefused --tries=3 -O v1.6.17.tar.gz \
     && tar xzfv v1.6.17.tar.gz
 
 RUN wget -q --retry-connrefused --tries=3 -O nfsen.tar.gz \
-    "https://bit.ly/2NpMHqV" \
+    "https://downloads.sourceforge.net/project/nfsen/stable/nfsen-1.3.6p1/nfsen-1.3.6p1.tar.gz" \
     && tar zxfv nfsen.tar.gz
 
 # ===========================================================================

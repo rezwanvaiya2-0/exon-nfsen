@@ -12,12 +12,12 @@ Create and navigate to a new folder:
 mkdir ~/nfsen && cd ~/nfsen
 
 Download the required files:
-wget https://bit.ly/2NpMHqV     >>> NfSend
+wget https://downloads.sourceforge.net/project/nfsen/stable/nfsen-1.3.6p1/nfsen-1.3.6p1.tar.gz     >>> NfSend
 wget https://github.com/phaag/nfdump/archive/v1.6.17.tar.gz    >>>NfDump
 
 
 Extract the files:
-tar zxfv 2NpMHqV
+tar zxfv nfsen-1.3.6p1.tar.gz
 tar xzfv v1.6.17.tar.gz
 
 Install Dependencies
