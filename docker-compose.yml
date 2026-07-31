@@ -25,9 +25,12 @@ services:
       - nfsen-etc:/var/nfsen/etc
     environment:
       - TZ=Asia/Dhaka
-      # The container starts with NO router sources - add yours here when you
-      # connect routers, e.g.:
-      # - NFSEN_SOURCES=2070:myrouter:#FF0000
+      # A demo source 'router1' on port 2055 ships by default (in
+      # config/nfsen.conf) so the Web UI shows graph placeholders on first
+      # install. Replace it with your real routers (docker exec method in the
+      # README). NFSEN_SOURCES is optional - use it only if you prefer
+      # managing all sources here, e.g.:
+      # - NFSEN_SOURCES=2055:router1:#0000ff,2070:myrouter:#FF0000
     cap_add:
       - NET_ADMIN
       - NET_RAW
