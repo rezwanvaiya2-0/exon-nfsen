@@ -10,12 +10,9 @@ echo "========================================================================="
 echo "  NfSen 1.3.6p1 + NfDump 1.6.17 Docker Container"
 echo "  Ubuntu 20.04"
 echo "========================================================================="
-echo ""
-echo "  Exonhost - The Best Hosting Provider in Bangladesh"
-echo "  This project was created by Rezwan"
-echo "  Facebook: https://web.facebook.com/rezwanvaiya"
-echo "  Made during HSC exam - keep prayer for me for the result"
-echo "========================================================================="
+
+# Credit popup (same banner script used at build time - shared, no duplication)
+/usr/local/bin/exonhost-banner.sh
 
 # ---------------------------------------------------------------------------
 # Configure NetFlow sources from environment variable

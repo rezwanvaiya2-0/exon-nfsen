@@ -14,14 +14,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Dhaka
 
 # ===========================================================================
-# STEP 0: Credit banner - printed on the terminal while building the image
+# STEP 0: Credit banner - shown as a "popup" while building the image.
+# The banner text lives in banner.sh so this step shows only a clean
+# `RUN /usr/local/bin/exonhost-banner.sh 3` instead of raw echo commands.
 # ===========================================================================
-RUN echo "======================================================" && \
-    echo "  Exonhost - The Best Hosting Provider in Bangladesh" && \
-    echo "  This project was created by Rezwan" && \
-    echo "  Facebook: https://web.facebook.com/rezwanvaiya" && \
-    echo "  Made during HSC exam - keep prayer for me for the result" && \
-    echo "======================================================"
+COPY banner.sh /usr/local/bin/exonhost-banner.sh
+RUN chmod +x /usr/local/bin/exonhost-banner.sh
+RUN /usr/local/bin/exonhost-banner.sh 3
 
 # ===========================================================================
 # STEP 1: Install Dependencies (exactly as guide says)
