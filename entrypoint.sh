@@ -11,8 +11,9 @@ echo "  NfSen 1.3.6p1 + NfDump 1.6.17 Docker Container"
 echo "  Ubuntu 20.04"
 echo "========================================================================="
 
-# Credit popup (same banner script used at build time - shared, no duplication)
-/usr/local/bin/exonhost-banner.sh
+# Credit popup (same banner script used at build time - shared, no duplication).
+# Pauses 5s so the whole box is clearly visible before services start.
+/usr/local/bin/exonhost-banner.sh 5
 
 # ---------------------------------------------------------------------------
 # Configure NetFlow sources from environment variable

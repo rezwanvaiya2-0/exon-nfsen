@@ -16,11 +16,11 @@ ENV TZ=Asia/Dhaka
 # ===========================================================================
 # STEP 0: Credit banner - shown as a "popup" while building the image.
 # The banner text lives in banner.sh so this step shows only a clean
-# `RUN /usr/local/bin/exonhost-banner.sh 3` instead of raw echo commands.
+# `RUN /usr/local/bin/exonhost-banner.sh 5` instead of raw echo commands.
 # ===========================================================================
 COPY banner.sh /usr/local/bin/exonhost-banner.sh
 RUN chmod +x /usr/local/bin/exonhost-banner.sh
-RUN /usr/local/bin/exonhost-banner.sh 3
+RUN /usr/local/bin/exonhost-banner.sh 5
 
 # ===========================================================================
 # STEP 1: Install Dependencies (exactly as guide says)
