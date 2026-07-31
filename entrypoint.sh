@@ -10,6 +10,12 @@ echo "========================================================================="
 echo "  NfSen 1.3.6p1 + NfDump 1.6.17 Docker Container"
 echo "  Ubuntu 20.04"
 echo "========================================================================="
+echo ""
+echo "  Exonhost - The Best Hosting Provider in Bangladesh"
+echo "  This project was created by Rezwan"
+echo "  Facebook: https://web.facebook.com/rezwanvaiya"
+echo "  Made during HSC exam - keep prayer for me for the result"
+echo "========================================================================="
 
 # ---------------------------------------------------------------------------
 # Configure NetFlow sources from environment variable
@@ -76,8 +82,12 @@ chmod 777 "${NFSEN_BASEDIR}/var/run" 2>/dev/null || true
 # ---------------------------------------------------------------------------
 echo "[INFO] Starting Apache on port 8070..."
 rm -f /var/run/apache2/apache2.pid 2>/dev/null || true
-apache2ctl start
-echo "[OK] Apache started."
+if apache2ctl start 2>&1; then
+    echo "[OK] Apache started."
+else
+    echo "[ERROR] Apache FAILED to start! Run: docker compose logs exon-nfsen"
+    apache2ctl configtest 2>&1 || true
+fi
 
 # ---------------------------------------------------------------------------
 # Start NfSen (guide: /var/nfsen/bin/nfsen start)
@@ -117,8 +127,16 @@ echo "========================================================================="
 # Trap for graceful shutdown
 trap 'echo "Shutting down..."; ${NFSEN_BASEDIR}/bin/nfsen stop 2>/dev/null; apache2ctl stop; exit 0' SIGTERM SIGINT
 
-# Keep container running
-exec tail -f /var/log/apache2/error.log \
-            /var/log/apache2/access.log \
-            "${NFSEN_BASEDIR}/var/nfsen.log" 2>/dev/null || \
-    exec sleep infinity
+# Keep container running.
+# NOTE: the old code used `exec tail -f ... || exec sleep infinity` which is
+# broken: once `exec` replaces the shell, the `|| sleep infinity` fallback can
+# NEVER run. If tail exits (e.g. a log file is missing on first start), the
+# container exits and `restart: unless-stopped` crash-loops forever -
+# docker compose shows "Trying to reconnect!" while it waits to re-attach.
+# `--retry` makes tail keep waiting for log files that don't exist yet, and
+# `sleep infinity` is the safety net if tail ever does exit.
+tail -F \
+    /var/log/apache2/error.log \
+    /var/log/apache2/access.log \
+    "${NFSEN_BASEDIR}/var/nfsen.log" || \
+    sleep infinity
