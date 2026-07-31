@@ -16,7 +16,7 @@ Access: **http://\<YOUR_IP\>:8070/nfsen.php**
 
 Timezone: **Asia/Dhaka**
 
-> **No rebuild needed for new routers!** The container exposes a UDP port range `2055–2099`, so you can add up to 45 router sources without ever modifying `docker-compose.yml` or rebuilding. Just use `docker exec` to add a source (see [Managing Router Sources](#managing-router-sources)).
+> **UDP ports `2055` and `2056` are pre-opened.** Every router needs its own port, and that port must be added to `docker-compose.yml` before its data can arrive. To connect a router on a **new** port: add the port + source in `docker-compose.yml`, then run `docker compose up -d` — ~3 seconds, **no image rebuild, no data loss**. See [Adding a Router on a New Port](#adding-a-router-on-a-new-port).
 
 ---
 
@@ -124,26 +124,57 @@ If you add a source with an IP while existing sources lack one, the command will
 
 ---
 
-## Port Range — No Rebuild Needed for New Sources
+## Adding a Router on a New Port
 
-`docker-compose.yml` exposes a **UDP port range `2055–2099`** (45 ports), so you can add up to **45 routers** on different ports without ever rebuilding the project.
+Only **UDP ports `2055` and `2056`** are open by default. When you connect a router that sends NetFlow to a **new port**, that port must be opened in `docker-compose.yml` — otherwise the router's packets are dropped and you will see no data.
 
-### Adding a new router source (example: port 2056):
+### Step-by-step (example: new router on port 2070)
+
+1. Edit `docker-compose.yml` on the VPS:
 
 ```bash
-docker exec exon-nfsen bash -c "sed -i \"/^);\$/i\\    'router2' => { 'port' => '2056', 'col' => '#32CD32', 'type' => 'netflow' },\" /var/nfsen/etc/nfsen.conf && /var/nfsen/bin/nfsen reconfig && echo '✓ Done'"
+cd exon-nfsen
+nano docker-compose.yml
 ```
 
-That's it! No compose edits, no rebuild. The port is already exposed by the range.
+2. Add the new port under `ports:` (only the ports you use are published):
+
+```yaml
+    ports:
+      - "8070:8070"
+      - "2055:2055/udp"
+      - "2056:2056/udp"
+      - "2070:2070/udp"      # <- new router port
+```
+
+3. Add the source to `NFSEN_SOURCES` (the container configures it automatically on every start):
+
+```yaml
+    environment:
+      - NFSEN_SOURCES=2055:exonhost_microtik:#0000ff,2070:myrouter:#FF0000
+```
+
+4. Recreate the container — done:
+
+```bash
+docker compose up -d
+```
+
+That's it: the port opens **and** the router source is configured automatically. Takes ~3 seconds. (Commands use `docker compose` — Docker v2. If your VPS has the older tool, use `docker-compose` instead.)
+
+> ✅ **No rebuild:** the image is not rebuilt — only the container is recreated, fast and safe.
+> ✅ **No data loss:** `docker compose up -d` keeps all your NetFlow data (it lives in Docker volumes).
+> ⚠️ **The ONLY command that deletes your data is `docker compose down -v`** — never add `-v` unless you want a completely fresh start.
 
 ---
 
 ## Notes
 
-- **Port range 2055–2099** is pre-exposed — no need to touch `docker-compose.yml` for new routers
-- Config changes persist as long as the container exists (via Docker volumes)
+- **UDP ports 2055 and 2056** are pre-opened — add more in `docker-compose.yml` as needed (see [Adding a Router on a New Port](#adding-a-router-on-a-new-port))
+- Sources defined in `NFSEN_SOURCES` are configured automatically on every container start — so manage ALL your sources there (`docker exec` additions get overwritten on restart)
 - Rebuilding the image resets nfsen.conf — re-run the add commands
-- NetFlow data in Docker volumes survives rebuilds
+- NetFlow data in Docker volumes survives rebuilds and recreates
+- ⚠️ Only `docker compose down -v` deletes data — never add `-v` unless you want a fresh start
 
 ---
 
