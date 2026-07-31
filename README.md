@@ -121,7 +121,7 @@ That's it: the port opens **and** the router source is configured automatically.
 
 ### Replace or remove the demo `router1` source
 
-The container ships with a demo source `router1` listening on port **2055**. Once you connect your real router, replace or remove it with `docker exec`:
+The container ships with a demo source `router1` listening on port **2055** so the Web UI shows graphs on first install — **no manual setup needed**. It appears automatically on a fresh build, and the entrypoint also seeds it on any container that starts with zero sources (e.g. an older one whose config volume was seeded empty). Once you add your real routers, the fallback never runs again and your sources are never touched. Once you connect your real router, replace or remove the demo with `docker exec`:
 
 ```bash
 # Remove the demo source
@@ -130,12 +130,14 @@ docker exec exon-nfsen bash -c "sed -i \"/'router1' =>/d\" /var/nfsen/etc/nfsen.
 
 Or simply add your real router on port 2055 (see [Add a source with IP](#add-a-source-with-ip)) and ignore the demo until you remove it.
 
+> ⚠️ **To keep the demo gone permanently, keep at least one real source.** If your `%sources` list ever becomes completely empty (e.g. you remove `router1` and have no other routers yet), the demo is re-seeded automatically on the next container start. That's the safety net that guarantees the Web UI always shows graphs — once you have any real router, the demo never comes back.
+
 ---
 
 ## Notes
 
 - **UDP ports 2055 and 2056** are pre-opened — add more in `docker-compose.yml` as needed (see [Adding a Router on a New Port](#adding-a-router-on-a-new-port))
-- A **demo source `router1`** on port 2055 ships by default so the Web UI shows graphs on first install — remove or replace it with your real routers (see [Replace or remove the demo source](#replace-or-remove-the-demo-router1-source))
+- A **demo source `router1`** on port 2055 ships by default (seeded automatically if a container has zero sources) so the Web UI shows graphs on first install — remove or replace it with your real routers (see [Replace or remove the demo source](#replace-or-remove-the-demo-router1-source))
 - **Router sources added via `docker exec` now persist forever** — `nfsen.conf` lives in a Docker volume (`nfsen-etc`), so it survives restarts, recreates, and even rebuilds. No env vars needed.
 - The `NFSEN_SOURCES` env var is **optional** — use it only if you prefer managing sources in `docker-compose.yml` instead of `docker exec`
 - NetFlow data in Docker volumes survives rebuilds and recreates

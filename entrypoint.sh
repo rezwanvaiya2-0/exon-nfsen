@@ -39,6 +39,18 @@ if [ -n "$NFSEN_SOURCES" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Demo source fallback - seed 'router1' ONLY when NO sources are configured.
+# This guarantees the Web UI shows graph placeholders on a first build (and on
+# older containers whose config volume was seeded empty), with NO manual step.
+# It never overwrites sources added via docker exec / NFSEN_SOURCES, so your
+# real routers are always safe.
+# ---------------------------------------------------------------------------
+if ! sed -n '/^%sources/,/^);/p' "${NFSEN_BASEDIR}/etc/nfsen.conf" | grep -qE "=> \{"; then
+    echo "[INFO] No router sources configured - seeding demo 'router1' source..."
+    sed -i "/^);$/i\\    'router1' => { 'port' => '2055', 'IP' => '0.0.0.0', 'col' => '#0000ff', 'type' => 'netflow' }," "${NFSEN_BASEDIR}/etc/nfsen.conf" 2>/dev/null || true
+fi
+
+# ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 # Ensure required directories exist
 # ---------------------------------------------------------------------------
