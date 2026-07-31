@@ -18,7 +18,7 @@ echo "========================================================================="
 # ---------------------------------------------------------------------------
 # Configure NetFlow sources from environment variable
 # ---------------------------------------------------------------------------
-if [ -n "$NFSEN_SOURCES" ] && [ "$NFSEN_SOURCES" != "2055:exonhost_microtik:#0000ff" ]; then
+if [ -n "$NFSEN_SOURCES" ]; then
     echo "[INFO] Configuring NetFlow sources from NFSEN_SOURCES env var..."
     SOURCES_STR="%sources = ("
     IFS=',' read -ra SOURCE_ARRAY <<< "$NFSEN_SOURCES"

@@ -83,7 +83,6 @@ $WWWGROUP = "www-";  >   $WWWGROUP = "www-data";
 And more below you will find the router config like: 
 
 %sources = (
-    'exonhost_microtik'    => { 'port' => '2055', 'col' => '#0000ff', 'type' => 'netflow' },
     'peer1'        => { 'port' => '9996', 'IP' => '172.16.17.18' },
     'peer2'        => { 'port' => '9996', 'IP' => '172.16.17.19' },
 );

@@ -10,9 +10,10 @@ services:
     ports:
       - "8070:8070"
       # Only the UDP ports you actually use are published (2055 + 2056).
-      # To open a new port for a router: add its line here, add the source to
-      # NFSEN_SOURCES below, then run `docker compose up -d` (~3s, no rebuild,
-      # no data loss). NEVER use `down -v` unless you want to wipe your data.
+      # To open a new port for a router: add its line here and add the source
+      # to the NFSEN_SOURCES environment variable below, then run
+      # `docker compose up -d` (~3s, no rebuild, no data loss). NEVER use
+      # `down -v` unless you want to wipe your data.
       - "2055:2055/udp"
       - "2056:2056/udp"
     volumes:
@@ -21,7 +22,9 @@ services:
       - nfsen-var:/var/nfsen/var
     environment:
       - TZ=Asia/Dhaka
-      - NFSEN_SOURCES=2055:exonhost_microtik:#0000ff
+      # The container starts with NO router sources - add yours here when you
+      # connect routers, e.g.:
+      # - NFSEN_SOURCES=2070:myrouter:#FF0000
     cap_add:
       - NET_ADMIN
       - NET_RAW

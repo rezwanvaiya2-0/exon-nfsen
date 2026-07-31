@@ -20,25 +20,6 @@ Timezone: **Asia/Dhaka**
 
 ---
 
-## ⚠️ First Time Setup: Remove Default Source
-
-The container comes with a **default source** `exonhost_microtik` listening on port **2055**. Before you can add your own routers, you **must remove this default source** first.
-
-> **Why?** Multiple sources cannot share the same port. The default source occupies port 2055, so your new router source on the same port will conflict.
-
-Remove it with this one-liner (works on any host — no `sed` required):
-
-```bash
-docker exec exon-nfsen bash -c "sed -i \"/'exonhost_microtik' =>/d\" /var/nfsen/etc/nfsen.conf && /var/nfsen/bin/nfsen reconfig && echo '✓ Removed'"
-```
-
-Verify it's gone:
-```bash
-docker exec exon-nfsen grep -A 5 '%sources' /var/nfsen/etc/nfsen.conf
-```
-
----
-
 ## Managing Router Sources
 
 > ⚠️ **Host `sed` may not be installed!** If you get `Command 'sed' not found`, use the **`docker exec` method** instead (no host tools needed).
@@ -71,15 +52,10 @@ echo "✓ Done"
 
 #### Method 1: Docker exec (recommended — works on any host)
 
-Replace `NAME` with your source name (e.g., `router1`, `exonhost_microtik`):
+Replace `NAME` with your source name (e.g., `router1`):
 
 ```bash
 docker exec exon-nfsen bash -c "sed -i \"/'NAME' =>/d\" /var/nfsen/etc/nfsen.conf && /var/nfsen/bin/nfsen reconfig && echo '✓ Removed'"
-```
-
-Example — remove the default source:
-```bash
-docker exec exon-nfsen bash -c "sed -i \"/'exonhost_microtik' =>/d\" /var/nfsen/etc/nfsen.conf && /var/nfsen/bin/nfsen reconfig && echo '✓ Removed'"
 ```
 
 #### Method 2: Docker cp (uses host sed)
@@ -126,7 +102,7 @@ If you add a source with an IP while existing sources lack one, the command will
 
 ## Adding a Router on a New Port
 
-Only **UDP ports `2055` and `2056`** are open by default. When you connect a router that sends NetFlow to a **new port**, that port must be opened in `docker-compose.yml` — otherwise the router's packets are dropped and you will see no data.
+Only **UDP ports `2055` and `2056`** are open, and **no router sources are configured** — you add your own routers. When you connect a router that sends NetFlow to a **new port**, that port must be opened in `docker-compose.yml` — otherwise the router's packets are dropped and you will see no data.
 
 ### Step-by-step (example: new router on port 2070)
 
@@ -151,7 +127,7 @@ nano docker-compose.yml
 
 ```yaml
     environment:
-      - NFSEN_SOURCES=2055:exonhost_microtik:#0000ff,2070:myrouter:#FF0000
+      - NFSEN_SOURCES=2070:myrouter:#FF0000
 ```
 
 4. Recreate the container — done:
