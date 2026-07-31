@@ -14,6 +14,16 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Dhaka
 
 # ===========================================================================
+# STEP 0: Credit banner - printed on the terminal while building the image
+# ===========================================================================
+RUN echo "======================================================" && \
+    echo "  Exonhost - The Best Hosting Provider in Bangladesh" && \
+    echo "  This project was created by Rezwan" && \
+    echo "  Facebook: https://web.facebook.com/rezwanvaiya" && \
+    echo "  Made during HSC exam - keep prayer for me for the result" && \
+    echo "======================================================"
+
+# ===========================================================================
 # STEP 1: Install Dependencies (exactly as guide says)
 # ===========================================================================
 RUN apt-get update && apt-get install -y \
