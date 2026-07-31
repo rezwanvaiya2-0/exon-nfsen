@@ -16,7 +16,7 @@ Access: **http://\<YOUR_IP\>:8070/nfsen.php**
 
 Timezone: **Asia/Dhaka**
 
-> **No rebuild needed for new routers!** The container exposes a UDP port range `2055–3000`, so you can add up to 900+ router sources without ever modifying `docker-compose.yml` or rebuilding. Just use `docker exec` to add a source (see [Managing Router Sources](#managing-router-sources)).
+> **No rebuild needed for new routers!** The container exposes a UDP port range `2055–2099`, so you can add up to 45 router sources without ever modifying `docker-compose.yml` or rebuilding. Just use `docker exec` to add a source (see [Managing Router Sources](#managing-router-sources)).
 
 ---
 
@@ -42,7 +42,7 @@ docker-compose up -d --build
 
 ### 2. High RAM/CPU after start (the VPS resource hog)
 
-The UDP range `2055–3000` = **946 published ports**. Docker's default userland proxy spawns **one `docker-proxy` process per port** → ~946 idle processes eating RAM and CPU even when NfSen does nothing.
+The UDP range `2055–2099` = **45 published ports**. Docker's default userland proxy spawns **one `docker-proxy` process per port** → 45 idle processes eating RAM and CPU even when NfSen does nothing.
 
 Optional fix (host-level, one time) — disable the userland proxy so forwarding is done by kernel iptables with **zero extra processes**. Edit `/etc/docker/daemon.json` on the VPS:
 
@@ -179,7 +179,7 @@ If you add a source with an IP while existing sources lack one, the command will
 
 ## Port Range — No Rebuild Needed for New Sources
 
-`docker-compose.yml` exposes a **UDP port range `2055–3000`** (900+ ports), so you can add up to **900+ routers** on different ports without ever rebuilding the project.
+`docker-compose.yml` exposes a **UDP port range `2055–2099`** (45 ports), so you can add up to **45 routers** on different ports without ever rebuilding the project.
 
 ### Adding a new router source (example: port 2056):
 
@@ -193,7 +193,7 @@ That's it! No compose edits, no rebuild. The port is already exposed by the rang
 
 ## Notes
 
-- **Port range 2055–3000** is pre-exposed — no need to touch `docker-compose.yml` for new routers
+- **Port range 2055–2099** is pre-exposed — no need to touch `docker-compose.yml` for new routers
 - Config changes persist as long as the container exists (via Docker volumes)
 - Rebuilding the image resets nfsen.conf — re-run the add commands
 - NetFlow data in Docker volumes survives rebuilds

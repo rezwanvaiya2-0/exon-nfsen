@@ -9,7 +9,11 @@ services:
     restart: unless-stopped
     ports:
       - "8070:8070"
-      - "2055-3000:2055-3000/udp"
+      # 45 UDP ports (2055-2099) = up to 45 router sources.
+      # WIDER ranges spawn one docker-proxy process per port - the old
+      # 2055-3000 (946 ports) made the container slow to start and OOM-killed
+      # it on small VPSs. Extend this range only if you truly need >45 routers.
+      - "2055-2099:2055-2099/udp"
     volumes:
       - nfsen-data:/var/nfsen/profiles-data
       - nfsen-stat:/var/nfsen/profiles-stat
