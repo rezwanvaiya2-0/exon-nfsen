@@ -14,13 +14,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Dhaka
 
 # ===========================================================================
-# STEP 0: Credit banner - shown as a "popup" while building the image.
-# The banner text lives in banner.sh so this step shows only a clean
-# `RUN /usr/local/bin/exonhost-banner.sh 5` instead of raw echo commands.
+# STEP 0: Copy the credit banner script - it is shown at container START
+# (in the entrypoint), NOT during the build, to keep the build log clean.
 # ===========================================================================
 COPY banner.sh /usr/local/bin/exonhost-banner.sh
 RUN chmod +x /usr/local/bin/exonhost-banner.sh
-RUN /usr/local/bin/exonhost-banner.sh 5
 
 # ===========================================================================
 # STEP 1: Install Dependencies (exactly as guide says)
