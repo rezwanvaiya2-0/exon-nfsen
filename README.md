@@ -10,13 +10,62 @@ cd exon-nfsen
 docker-compose up -d --build
 ```
 
-> **`--build` is only needed on the first run.** After that, restarting the container only requires `docker-compose down && docker-compose up -d` (no `--build`). Your sources, config, and data all persist thanks to Docker volumes.
+> **`--build` is only needed on the first run.** After that, restarting the container only requires `docker-compose down && docker-compose up -d` (no `--build`). Your sources, config, and data all persist thanks to the data folders next to `docker-compose.yml` (see [Data Folders](#data-folders-bind-mounts)).
 
 Access: **http://\<YOUR_IP\>:8070/nfsen.php**
 
 Timezone: **Asia/Dhaka**
 
 > **UDP ports `2055` and `2056` are pre-opened.** Every router needs its own port, and that port must be added to `docker-compose.yml` before its data can arrive. To connect a router on a **new** port: add the port + source in `docker-compose.yml`, then run `docker compose up -d` — ~3 seconds, **no image rebuild, no data loss**. See [Adding a Router on a New Port](#adding-a-router-on-a-new-port).
+
+---
+
+## Data Folders (Bind Mounts)
+
+Your data now lives in **4 real folders next to `docker-compose.yml`** — no more hidden Docker volumes. You can see, browse, back up, and even mount/unmount them without ever losing data:
+
+| Folder | Inside the container | What it holds |
+|---|---|---|
+| `nfsen-data/` | `/var/nfsen/profiles-data` | Raw flow records (captured NetFlow files) |
+| `nfsen-stat/` | `/var/nfsen/profiles-stat` | RRD graph files (the charts in the Web UI) |
+| `nfsen-var/` | `/var/nfsen/var` | Logs, cache, runtime files |
+| `nfsen-etc/` | `/var/nfsen/etc` | `nfsen.conf` (router sources config) |
+
+- The folders are created automatically on first start (`docker compose up`), and the entrypoint seeds the default config + demo source when `nfsen-etc/` is empty.
+- **Mount / unmount freely** — `docker compose stop`, `down`, `up -d`, even `down -v` no longer delete anything: your data lives in the host folders, not inside Docker. Only `rm -rf` of the folders themselves deletes it.
+- **Back up anytime** (container can keep running): `cp -a nfsen-data nfsen-data-backup` or `tar czf nfsen-backup.tar.gz nfsen-data nfsen-stat nfsen-var nfsen-etc`.
+
+### Migrating from the old named volumes
+
+If you already had data in the old Docker volumes and want to move it into the new folders:
+
+```bash
+cd exon-nfsen
+git pull
+# stop the container first
+sudo docker compose down
+
+# create the new folders first (docker compose up would create them, but we
+# need them NOW so the copies below have a target)
+mkdir -p nfsen-data nfsen-stat nfsen-var nfsen-etc
+
+# copy the existing data from each old volume into its new folder
+sudo cp -a /var/lib/docker/volumes/exon-nfsen_nfsen-data/_data/. nfsen-data/
+sudo cp -a /var/lib/docker/volumes/exon-nfsen_nfsen-stat/_data/. nfsen-stat/
+sudo cp -a /var/lib/docker/volumes/exon-nfsen_nfsen-var/_data/. nfsen-var/
+sudo cp -a /var/lib/docker/volumes/exon-nfsen_nfsen-etc/_data/. nfsen-etc/
+
+# fix ownership so NfSen can write to the copied data
+sudo docker compose up -d
+docker exec exon-nfsen chown -R netflow:www-data /var/nfsen/profiles-data/live/ && docker exec exon-nfsen chown -R www-data:www-data /var/nfsen/profiles-stat/live/
+
+# old volumes are now unused - you may delete them to free space
+sudo docker volume rm exon-nfsen_nfsen-data exon-nfsen_nfsen-stat exon-nfsen_nfsen-var exon-nfsen_nfsen-etc
+```
+
+> ⚠️ If you pull and start **without** migrating, the new folders start empty (your old data stays safe in the named volumes, just not mounted). Do the copy steps above first if you want to keep existing graphs.
+
+---
 
 ---
 
@@ -116,8 +165,8 @@ docker compose up -d
 That's it: the port opens **and** the router source is configured automatically. Takes ~3 seconds. (Commands use `docker compose` — Docker v2. If your VPS has the older tool, use `docker-compose` instead.)
 
 > ✅ **No rebuild:** the image is not rebuilt — only the container is recreated, fast and safe.
-> ✅ **No data loss:** `docker compose up -d` keeps all your NetFlow data (it lives in Docker volumes).
-> ⚠️ **The ONLY command that deletes your data is `docker compose down -v`** — never add `-v` unless you want a completely fresh start.
+> ✅ **No data loss:** `docker compose up -d` keeps all your NetFlow data (it lives in the `nfsen-data/` folder next to `docker-compose.yml`).
+> ⚠️ **`docker compose down -v` no longer deletes your data** — it now uses bind mounts, and `-v` only removes *named* volumes. Your data only disappears if you `rm -rf` the folders yourself (see [Data Folders](#data-folders-bind-mounts)).
 
 ### Replace or remove the demo `router1` source
 
@@ -138,11 +187,11 @@ Or simply add your real router on port 2055 (see [Add a source with IP](#add-a-s
 
 - **UDP ports 2055 and 2056** are pre-opened — add more in `docker-compose.yml` as needed (see [Adding a Router on a New Port](#adding-a-router-on-a-new-port))
 - A **demo source `router1`** on port 2055 ships by default (seeded automatically if a container has zero sources) so the Web UI shows graphs on first install — remove or replace it with your real routers (see [Replace or remove the demo source](#replace-or-remove-the-demo-router1-source))
-- **Router sources added via `docker exec` now persist forever** — `nfsen.conf` lives in a Docker volume (`nfsen-etc`), so it survives restarts, recreates, and even rebuilds. No env vars needed.
+- **Router sources added via `docker exec` now persist forever** — `nfsen.conf` lives in the `nfsen-etc/` folder, so it survives restarts, recreates, and even rebuilds. No env vars needed.
 - The `NFSEN_SOURCES` env var is **optional** — use it only if you prefer managing sources in `docker-compose.yml` instead of `docker exec`
-- NetFlow data in Docker volumes survives rebuilds and recreates
-- ⚠️ Only `docker compose down -v` deletes data and router sources — never add `-v` unless you want a fresh start
-- ⚠️ The `nfsen-etc` volume is seeded from the image only on the **first** start — if you later change `config/nfsen.conf` in the repo, update it inside the container too (or delete the volume)
+- **NetFlow data lives in the folders next to `docker-compose.yml`** (`nfsen-data/`, `nfsen-stat/`, `nfsen-var/`, `nfsen-etc/`) and survives rebuilds, recreates, and even `down -v` (see [Data Folders](#data-folders-bind-mounts))
+- ⚠️ `docker compose down -v` no longer deletes anything — only `rm -rf nfsen-data nfsen-stat nfsen-var nfsen-etc` does
+- ⚠️ `nfsen-etc/nfsen.conf` is seeded from the image only when the folder is **empty** — if you later change `config/nfsen.conf` in the repo, copy it over (`cp config/nfsen.conf nfsen-etc/nfsen.conf`) or delete the file and restart
 
 ---
 
@@ -193,10 +242,10 @@ df -h /
 # Stop the entire container (always works — doesn't need the nfsen socket)
 docker stop exon-nfsen
 
-# Delete the flow data directly from Docker volumes
-rm -rf /var/lib/docker/volumes/exon-nfsen_nfsen-data/_data/live/*
-rm -rf /var/lib/docker/volumes/exon-nfsen_nfsen-stat/_data/live/*
-rm -rf /var/lib/docker/volumes/exon-nfsen_nfsen-var/_data/*
+# Delete the flow data directly from the data folders (bind mounts)
+rm -rf nfsen-data/live/*
+rm -rf nfsen-stat/live/*
+rm -rf nfsen-var/*
 
 # Start fresh
 docker start exon-nfsen

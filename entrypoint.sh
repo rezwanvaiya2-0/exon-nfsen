@@ -16,6 +16,18 @@ echo "========================================================================="
 /usr/local/bin/exonhost-banner.sh 5
 
 # ---------------------------------------------------------------------------
+# Seed nfsen.conf on a fresh nfsen-etc bind mount
+# ---------------------------------------------------------------------------
+# When nfsen-etc is a bind mount, an empty host folder HIDES the image's
+# baked-in /var/nfsen/etc/nfsen.conf. If it's missing, copy the pristine
+# default from /opt/nfsen.conf.default so NfSen always has a config.
+if [ ! -f "${NFSEN_BASEDIR}/etc/nfsen.conf" ]; then
+    echo "[INFO] nfsen.conf missing (fresh nfsen-etc mount) - seeding default config..."
+    cp /opt/nfsen.conf.default "${NFSEN_BASEDIR}/etc/nfsen.conf"
+    chown www-data:www-data "${NFSEN_BASEDIR}/etc/nfsen.conf"
+fi
+
+# ---------------------------------------------------------------------------
 # Configure NetFlow sources from environment variable
 # ---------------------------------------------------------------------------
 if [ -n "$NFSEN_SOURCES" ]; then

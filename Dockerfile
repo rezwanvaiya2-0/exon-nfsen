@@ -158,6 +158,13 @@ RUN chown -R www-data:www-data /var/nfsen && \
     chmod 777 /var/nfsen/var/run 2>/dev/null || true
 
 # ===========================================================================
+# STEP 16b: Keep a pristine default nfsen.conf so the entrypoint can seed a
+# fresh (empty) nfsen-etc bind mount on first start (an empty host folder
+# hides the image's baked-in copy).
+# ===========================================================================
+COPY config/nfsen.conf /opt/nfsen.conf.default
+
+# ===========================================================================
 # STEP 17: Make nfsen reboot proof (guide: init.d symlink)
 # ===========================================================================
 RUN ln -sf /var/nfsen/bin/nfsen /etc/init.d/nfsen

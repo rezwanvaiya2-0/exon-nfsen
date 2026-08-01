@@ -17,12 +17,18 @@ services:
       - "2055:2055/udp"
       - "2056:2056/udp"
     volumes:
-      - nfsen-data:/var/nfsen/profiles-data
-      - nfsen-stat:/var/nfsen/profiles-stat
-      - nfsen-var:/var/nfsen/var
+      # Bind mounts: data lives in REAL folders next to docker-compose.yml
+      # (nfsen-data/ nfsen-stat/ nfsen-var/ nfsen-etc/) so you can see, browse,
+      # back up, and mount/unmount them without ever losing data. The folders
+      # are created automatically on first start.
+      - ./nfsen-data:/var/nfsen/profiles-data
+      - ./nfsen-stat:/var/nfsen/profiles-stat
+      - ./nfsen-var:/var/nfsen/var
       # nfsen.conf lives here - so router sources added via `docker exec`
       # persist forever (restarts, recreates, even rebuilds). No env vars needed.
-      - nfsen-etc:/var/nfsen/etc
+      # On a fresh (empty) folder the entrypoint seeds the default config
+      # + demo source automatically.
+      - ./nfsen-etc:/var/nfsen/etc
     environment:
       - TZ=Asia/Dhaka
       # A demo source 'router1' on port 2055 ships by default (in
@@ -36,16 +42,6 @@ services:
       - NET_RAW
     networks:
       - nfsen-net
-
-volumes:
-  nfsen-data:
-    driver: local
-  nfsen-stat:
-    driver: local
-  nfsen-var:
-    driver: local
-  nfsen-etc:
-    driver: local
 
 networks:
   nfsen-net:
