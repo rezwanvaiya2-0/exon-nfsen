@@ -32,8 +32,45 @@ Your data now lives in **4 real folders next to `docker-compose.yml`** — no mo
 | `nfsen-etc/` | `/var/nfsen/etc` | `nfsen.conf` (router sources config) |
 
 - The folders are created automatically on first start (`docker compose up`), and the entrypoint seeds the default config + demo source when `nfsen-etc/` is empty.
-- **Mount / unmount freely** — `docker compose stop`, `down`, `up -d`, even `down -v` no longer delete anything: your data lives in the host folders, not inside Docker. Only `rm -rf` of the folders themselves deletes it.
+- **Mount / unmount freely** — `docker compose stop`, `down`, `up -d`, even `down -v` no longer delete anything: your data lives in the host folders, not inside Docker. Only `rm -rf` of the folders themselves deletes it (and the container should be stopped first — see [Clean up](#clean-up--delete-the-data-folders) below).
 - **Back up anytime** (container can keep running): `cp -a nfsen-data nfsen-data-backup` or `tar czf nfsen-backup.tar.gz nfsen-data nfsen-stat nfsen-var nfsen-etc`.
+
+### Clean up / delete the data folders
+
+Because the folders are **bind mounts**, the running container is actively writing to them. So before deleting/cleaning a mounted folder, **unmount it first** (`docker compose down`) — deleting a folder that is still mounted can fail or leave the container in a broken state (it will keep trying to write into a deleted path).
+
+**Option 1 — Delete EVERYTHING (complete clean slate):**
+
+```bash
+cd exon-nfsen
+
+# 1) Unmount: stop and remove the container (releases the bind mounts)
+docker compose down
+
+# 2) Delete the data folders (this is the ONLY command that removes your data)
+rm -rf nfsen-data nfsen-stat nfsen-var nfsen-etc
+
+# 3) Remount fresh: folders are recreated empty and the entrypoint
+#    auto-seeds the default config + demo source
+sudo docker compose up -d
+```
+
+**Option 2 — Only clear the captured flow data (keep config + sources):**
+
+```bash
+cd exon-nfsen
+
+# 1) Unmount first
+docker compose down
+
+# 2) Delete only the flow data + graphs (keeps nfsen.conf / router sources)
+rm -rf nfsen-data/live/* nfsen-stat/live/*
+
+# 3) Remount — same config, empty graphs
+sudo docker compose up -d
+```
+
+> ℹ️ If the container is **already stopped** (e.g. after `docker compose stop` or `down`), the mounts are already released — you can delete the folders directly without any extra step. The rule is simple: **container stopped = folders free to delete; container running = unmount first.**
 
 ### Migrating from the old named volumes
 
