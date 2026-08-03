@@ -8,7 +8,7 @@
 2. [Data Folders & How Mounting Works](#data-folders-bind-mounts)
 3. [Managing Router Sources](#managing-router-sources)
 4. [Adding a Router on a New Port — how it actually works](#adding-a-router-on-a-new-port)
-5. [Credit Banner](#credit-banner)
+5. [Credit Banner & Build Popup](#credit-banner--build-popup)
 6. [Notes](#notes)
 7. [Storage Full — Recover Disk Space](#-storage-full--recover-disk-space)
 8. [Troubleshooting](#troubleshooting)
@@ -18,8 +18,10 @@
 ```bash
 git clone https://github.com/rezwanvaiya2-0/exon-nfsen.git
 cd exon-nfsen
-docker-compose up -d --build
+sudo ./install.sh          # credit banner + confirmation popup, then build & start
 ```
+
+> `./install.sh` is the same as `docker compose up -d --build` — it just shows the credit banner and a **confirmation popup first** ("press ENTER to continue / CTRL+C to cancel"). If you prefer no popup, run `sudo docker compose up -d --build` directly.
 
 > **`--build` is only needed on the first run.** After that, restarting the container only requires `docker-compose down && docker-compose up -d` (no `--build`). Your sources, config, and data all persist thanks to the data folders next to `docker-compose.yml` (see [Data Folders](#data-folders-bind-mounts)).
 
@@ -292,22 +294,41 @@ Or simply add your real router on port 2055 (see [Add a source with IP](#add-a-s
 
 ---
 
-## Credit Banner
+## Credit Banner & Build Popup
 
-A small credit popup (Exonhost / Rezwan) prints **when the container starts** — it never shows during the build. `docker compose build` only *packages* the script into the image; the popup itself is printed by the entrypoint at container start.
+The credit banner (Exonhost / Rezwan) appears in **two places**:
 
-> ⚠️ **With `docker compose up -d` the banner does NOT appear in your terminal.** The container runs detached, so its output goes to the Docker logs. To see the banner:
->
-> ```bash
-> docker compose up -d
-> docker logs exon-nfsen --tail 60    # the banner is at the TOP of this output
-> ```
->
-> (Or run `docker compose up` without `-d` once — the banner prints directly in the terminal while the container runs in the foreground.)
+**1) Build-time popup in your terminal — `./install.sh`**
 
-The banner pauses startup for ~5 seconds (`banner.sh 5` in the entrypoint) so it stays readable.
+When you start with `./install.sh`, the banner + a confirmation popup print in your terminal **before the build begins**:
 
-To remove the banner completely, delete all three: the `COPY banner.sh` + `RUN chmod +x` step in the `Dockerfile`, the `/usr/local/bin/exonhost-banner.sh 5` line in `entrypoint.sh`, and the `banner.sh` file.
+```
+   ╔════════════════════════════════════════════════════════════╗
+   ║   Exonhost - The Best Hosting Provider ...                 ║
+   ╚════════════════════════════════════════════════════════════╝
+   NfSen Docker Build - Confirmation
+   Press CTRL+C to cancel this build / installation.
+   Press ENTER to continue now.
+   Starting in 10 seconds... (ENTER to continue / CTRL+C to cancel)
+```
+
+- Stays on screen **at least 5 seconds** (default countdown: 10s).
+- **ENTER** = continue now · **CTRL+C** = cancel the build · timeout = continues automatically.
+- To change the popup text or timing, edit the top of `install.sh` (`POPUP_TITLE`, `POPUP_MESSAGE`, `POPUP_SECONDS`).
+
+**2) Container-start banner in the Docker logs**
+
+The entrypoint also prints the banner when the container starts. Because the container runs detached (`docker compose up -d`), this copy appears in the **Docker logs**, not in your terminal:
+
+```bash
+docker logs exon-nfsen --tail 60    # banner is at the TOP of this output
+```
+
+> Running `docker compose up -d --build` directly (skipping `./install.sh`) shows **no build popup**, but the container-start banner still appears in the logs.
+
+**To remove the log banner:** delete the `/usr/local/bin/exonhost-banner.sh 5` line in `entrypoint.sh`.
+**To skip the build popup:** just run `docker compose up -d --build` instead of `./install.sh`.
+**To remove everything:** also delete the `COPY banner.sh` step in the `Dockerfile` and the `banner.sh` file.
 
 ---
 
