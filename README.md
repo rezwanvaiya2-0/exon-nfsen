@@ -32,6 +32,7 @@ Your data now lives in **4 real folders next to `docker-compose.yml`** — no mo
 | `nfsen-etc/` | `/var/nfsen/etc` | `nfsen.conf` (router sources config) |
 
 - The folders are created automatically on first start (`docker compose up`), and the entrypoint seeds the default config + demo source when `nfsen-etc/` is empty.
+- **Why does `docker volume ls` show nothing?** These 4 folders are **bind mounts**, not Docker volumes. `docker volume ls` only lists *named* volumes — bind mounts are plain host folders and are intentionally invisible there. That is **normal and correct**: the folders themselves *are* the storage. To confirm they are mounted, run `docker inspect exon-nfsen` and look at the `Mounts` section (each shows `"Type": "bind"` with the matching `Source`/`Destination`), or simply `ls` the 4 folders next to `docker-compose.yml`.
 - **Mount / unmount freely** — `docker compose stop`, `down`, `up -d`, even `down -v` no longer delete anything: your data lives in the host folders, not inside Docker. Only `rm -rf` of the folders themselves deletes it (and the container should be stopped first — see [Clean up](#clean-up--delete-the-data-folders) below).
 - **Back up anytime** (container can keep running): `cp -a nfsen-data nfsen-data-backup` or `tar czf nfsen-backup.tar.gz nfsen-data nfsen-stat nfsen-var nfsen-etc`.
 
@@ -359,7 +360,8 @@ docker exec exon-nfsen bash -c "\
 
 | Problem | Fix |
 |---|---|
-| Web UI shows `nfsend connect() error` | `docker restart exon-nfsen`, or `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` |
+| Web UI shows `Can not initialize globals` / `nfsend connect() error: No such file or directory` / `nfsend - connection failed!!` | The nfsend daemon is not running. On the **first start after switching to the data folders (bind mounts)** this means the `live` profile is missing (an empty `nfsen-stat/` folder hides it and NfSen refuses to start). Fix once: `docker compose up -d --build` — the entrypoint re-seeds the profile automatically. Then check `docker logs exon-nfsen` for `nfsend .... running` |
+| Web UI shows `nfsend connect() error` (daemon was running before) | `docker restart exon-nfsen`, or `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` |
 | Config changes not showing after reconfig | `docker exec exon-nfsen /var/nfsen/bin/nfsen stop && docker exec exon-nfsen /var/nfsen/bin/nfsen start` (full restart if reconfig didn't work) |
 | `Error: missing parameter 'IP' for multiple sources collector` | Add `'IP' => '0.0.0.0'` to all existing sources manually. See [IP Requirement](#-important-ip-requirement-for-multiple-sources) |
 | `Reconfig: No changes found!` | The source name doesn't exist — check with `docker exec exon-nfsen grep -A 20 '%sources' /var/nfsen/etc/nfsen.conf` |

@@ -165,6 +165,23 @@ RUN chown -R www-data:www-data /var/nfsen && \
 COPY config/nfsen.conf /opt/nfsen.conf.default
 
 # ===========================================================================
+# STEP 16c: Snapshot the pristine 'live' profile (profile.dat + channel RRD
+# files + per-source data dirs). install.pl created it above, but an EMPTY
+# nfsen-stat / nfsen-data bind mount hides all of it on first start. Without
+# /var/nfsen/profiles-stat/live/profile.dat NfSen aborts with "Error reading
+# profile 'live'" and nfsend never starts (Web UI: "Can not initialize
+# globals"). The entrypoint re-seeds from this snapshot when profile.dat is
+# missing. TAKEN AFTER the chown above, so the seed files already have the
+# correct www-data / netflow ownership.
+# ===========================================================================
+RUN mkdir -p /opt/nfsen-seed/profiles-stat /opt/nfsen-seed/profiles-data \
+    && cp -a /var/nfsen/profiles-stat/live /opt/nfsen-seed/profiles-stat/live \
+    && cp -a /var/nfsen/profiles-data/live /opt/nfsen-seed/profiles-data/live \
+    && echo "[STEP 16c] live profile snapshotted:" \
+    && ls -la /opt/nfsen-seed/profiles-stat/live \
+    && ls -la /opt/nfsen-seed/profiles-data/live
+
+# ===========================================================================
 # STEP 17: Make nfsen reboot proof (guide: init.d symlink)
 # ===========================================================================
 RUN ln -sf /var/nfsen/bin/nfsen /etc/init.d/nfsen
@@ -188,8 +205,13 @@ EXPOSE 2055/udp
 
 # Health check — short start-period now that the entrypoint boots in seconds
 # (a 60s start-period kept the container in "Starting" state for a full minute)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8070/nfsen.php || exit 1
+# The Web UI returns HTTP 200 even when the nfsend daemon is DOWN (it renders
+# an error page), so ALSO require the daemon to actually be alive (pid file +
+# kill -0) and its Unix socket to exist — this is what catches the
+# "Can not initialize globals" state (a socket file alone can't be trusted:
+# it lingers if nfsend crashes mid-run).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:8070/nfsen.php && [ -f /var/nfsen/var/run/nfsend.pid ] && kill -0 "$(cat /var/nfsen/var/run/nfsend.pid)" 2>/dev/null && test -S /var/nfsen/var/run/nfsen.comm || exit 1
 
 # ===========================================================================
 # Entrypoint

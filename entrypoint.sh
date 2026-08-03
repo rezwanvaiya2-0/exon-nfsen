@@ -66,11 +66,36 @@ fi
 # ---------------------------------------------------------------------------
 # Ensure required directories exist
 # ---------------------------------------------------------------------------
-mkdir -p "${NFSEN_BASEDIR}/var/run"
-mkdir -p "${NFSEN_BASEDIR}/profiles-data/live"
-mkdir -p "${NFSEN_BASEDIR}/profiles-stat/live"
-mkdir -p "${NFSEN_BASEDIR}/profiles-stat"
-mkdir -p "${NFSEN_BASEDIR}/var"
+mkdir -p "${NFSEN_BASEDIR}/var/run" "${NFSEN_BASEDIR}/var/tmp" "${NFSEN_BASEDIR}/var"
+mkdir -p "${NFSEN_BASEDIR}/profiles-data/live" "${NFSEN_BASEDIR}/profiles-stat/live" "${NFSEN_BASEDIR}/profiles-stat"
+
+# ---------------------------------------------------------------------------
+# Seed the 'live' profile on a fresh nfsen-stat / nfsen-data bind mount
+# ---------------------------------------------------------------------------
+# NfSen REQUIRES /var/nfsen/profiles-stat/live/profile.dat to exist before
+# 'nfsen reconfig' or 'nfsen start' will run — bin/nfsen aborts with "Error
+# reading profile 'live'" (and nfsend never starts, so the Web UI shows
+# "Can not initialize globals") when it is missing.
+# install.pl created it during the image build, but an EMPTY nfsen-stat host
+# folder hides the image content. On first start we copy the pristine snapshot
+# (profile.dat + channel RRD files + per-source data dirs) back in. Later
+# starts keep whatever profile.dat exists, so your reconfigs/added sources
+# are never overwritten.
+if [ ! -s "${NFSEN_BASEDIR}/profiles-stat/live/profile.dat" ]; then
+    echo "[INFO] Live profile missing (fresh nfsen-stat mount) - seeding from image snapshot..."
+    mkdir -p "${NFSEN_BASEDIR}/profiles-stat/live" "${NFSEN_BASEDIR}/profiles-data/live"
+    cp -a /opt/nfsen-seed/profiles-stat/live/. "${NFSEN_BASEDIR}/profiles-stat/live/" 2>/dev/null \
+        || echo "[WARN] profile-stat seed copy failed (older image without snapshot?)"
+    cp -a /opt/nfsen-seed/profiles-data/live/. "${NFSEN_BASEDIR}/profiles-data/live/" 2>/dev/null \
+        || echo "[WARN] profile-data seed copy failed (older image without snapshot?)"
+    # Seeding fills profiles-data/live, which disables the "first run" full
+    # recursive chown below (it only runs on an EMPTY live dir) - so apply the
+    # same ownership here that that block would have set.
+    chown -R www-data:www-data "${NFSEN_BASEDIR}/profiles-stat" 2>/dev/null || true
+    chown www-data:www-data "${NFSEN_BASEDIR}/profiles-data" 2>/dev/null || true
+    chown -R netflow:www-data "${NFSEN_BASEDIR}/profiles-data/live" 2>/dev/null || true
+    chmod -R 775 "${NFSEN_BASEDIR}/profiles-stat" "${NFSEN_BASEDIR}/profiles-data" 2>/dev/null || true
+fi
 
 # Remove stale socket/PID files
 rm -f "${NFSEN_BASEDIR}/var/run/nfsen.comm" 2>/dev/null || true
@@ -116,9 +141,13 @@ fi
 # ---------------------------------------------------------------------------
 echo "[INFO] Starting NfSen..."
 if [ -f "${NFSEN_BASEDIR}/bin/nfsen" ]; then
-    # Run reconfig first to sync config with existing data directories
-    ${NFSEN_BASEDIR}/bin/nfsen reconfig 2>&1 || echo "[WARN] nfsen reconfig failed"
-    ${NFSEN_BASEDIR}/bin/nfsen start 2>&1 || echo "[WARN] nfsen start failed"
+    # Run reconfig first to sync config with existing data directories.
+    # Output goes straight to the console (docker logs) so failures like
+    # "Error reading profile 'live'" are VISIBLE instead of swallowed.
+    echo "---- nfsen reconfig ----"
+    ${NFSEN_BASEDIR}/bin/nfsen reconfig 2>&1
+    echo "---- nfsen start ----"
+    ${NFSEN_BASEDIR}/bin/nfsen start 2>&1
     sleep 2
     if [ -f "${NFSEN_BASEDIR}/var/run/nfsend.pid" ]; then
         echo "[OK] NfSen daemon running."
