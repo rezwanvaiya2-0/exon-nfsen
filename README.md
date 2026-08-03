@@ -2,6 +2,17 @@
 
 **NfSen 1.3.6p1 + NfDump 1.6.17** on Ubuntu 20.04 — fully Dockerized.
 
+## Table of Contents
+
+1. [Quick Start](#quick-start)
+2. [Data Folders & How Mounting Works](#data-folders-bind-mounts)
+3. [Managing Router Sources](#managing-router-sources)
+4. [Adding a Router on a New Port — how it actually works](#adding-a-router-on-a-new-port)
+5. [Credit Banner](#credit-banner)
+6. [Notes](#notes)
+7. [Storage Full — Recover Disk Space](#-storage-full--recover-disk-space)
+8. [Troubleshooting](#troubleshooting)
+
 ## Quick Start
 
 ```bash
@@ -35,6 +46,28 @@ Your data now lives in **4 real folders next to `docker-compose.yml`** — no mo
 - **Why does `docker volume ls` show nothing?** These 4 folders are **bind mounts**, not Docker volumes. `docker volume ls` only lists *named* volumes — bind mounts are plain host folders and are intentionally invisible there. That is **normal and correct**: the folders themselves *are* the storage. To confirm they are mounted, run `docker inspect exon-nfsen` and look at the `Mounts` section (each shows `"Type": "bind"` with the matching `Source`/`Destination`), or simply `ls` the 4 folders next to `docker-compose.yml`.
 - **Mount / unmount freely** — `docker compose stop`, `down`, `up -d`, even `down -v` no longer delete anything: your data lives in the host folders, not inside Docker. Only `rm -rf` of the folders themselves deletes it (and the container should be stopped first — see [Clean up](#clean-up--delete-the-data-folders) below).
 - **Back up anytime** (container can keep running): `cp -a nfsen-data nfsen-data-backup` or `tar czf nfsen-backup.tar.gz nfsen-data nfsen-stat nfsen-var nfsen-etc`.
+
+### How the mounting actually works
+
+Every line under `volumes:` in `docker-compose.yml` is a **bind mount** — one host folder "shared" with a path inside the container. Both sides see the SAME files (like a shared folder):
+
+```
+VPS host (on your server)            Inside the container
+────────────────────────────        ───────────────────────────────
+./nfsen-data/   ◄─── shared ───►    /var/nfsen/profiles-data/   raw NetFlow files
+./nfsen-stat/   ◄─── shared ───►    /var/nfsen/profiles-stat/   RRD graph files
+./nfsen-var/    ◄─── shared ───►    /var/nfsen/var/             logs + runtime
+./nfsen-etc/    ◄─── shared ───►    /var/nfsen/etc/             nfsen.conf (sources)
+```
+
+Example: when the collector saves flow data it writes to `/var/nfsen/profiles-data/live/router1/` *inside* the container — and because of the mount, the file physically lands in **`nfsen-data/live/router1/` on your VPS**. You can browse, copy, back up, or delete it directly from the host at any time.
+
+**Lifecycle rules:**
+
+- **Mount / unmount = start / stop the container.** `docker compose down` releases the mounts; `docker compose up -d` re-attaches them. The data never moves.
+- **Data survives everything** — rebuilds, recreates, and even `docker compose down -v` (that flag only deletes *named* volumes; your data lives in these host folders).
+- **The only thing that deletes your data** is `rm -rf nfsen-data nfsen-stat nfsen-var nfsen-etc` (stop the container first — see "Clean up" below).
+- **An empty host folder HIDES the image's built-in content** — that's why the entrypoint auto-seeds `nfsen.conf` into `nfsen-etc/` and the `live` profile into `nfsen-stat/` + `nfsen-data/` on first start. (This seeding is what fixed the old `Can not initialize globals` error.)
 
 ### Clean up / delete the data folders
 
@@ -167,6 +200,24 @@ If you add a source with an IP while existing sources lack one, the command will
 
 Only **UDP ports `2055` and `2056`** are open, and a **demo source `router1`** on port 2055 ships by default (so the Web UI shows graph placeholders on first install — no more "no data available"). You can keep it or replace it with your real routers. When you connect a router that sends NetFlow to a **new port**, that port must be opened in `docker-compose.yml` — otherwise the router's packets are dropped and you will see no data.
 
+### How it actually works (router → graph)
+
+```
+Your router ──UDP NetFlow──► VPS port 2070 ──(Docker port publish)──► container port 2070
+      ──(nfcapd collector, from the nfsen.conf source)──► nfsen-data/live/<router>/  (raw files)
+      ──(nfsend, every 5 min)──► nfsen-stat/live/<router>.rrd  (graphs)
+      ──► Web UI  http://YOUR_IP:8070/nfsen.php
+```
+
+1. **Your router sends NetFlow** to your VPS IP on a UDP port (e.g. `2070`).
+2. **Docker must forward that UDP port** into the container — that's the `ports:` line in `docker-compose.yml`. Without it, the packets are dropped before NfSen ever sees them.
+3. **nfcapd must listen on that port** — that's the router *source* in `nfsen.conf`. `nfsen reconfig` starts one collector (`nfcapd`) per port automatically.
+4. **nfcapd writes the raw flow files** into `/var/nfsen/profiles-data/live/<router>/` — which is your `nfsen-data/live/<router>/` folder (bind mount, see above).
+5. **nfsend turns them into graphs** (RRD files) in `/var/nfsen/profiles-stat/live/` — your `nfsen-stat/live/` folder.
+6. **The Web UI (port 8070) reads those RRD files** and draws the charts.
+
+So adding a router means **two things must both happen**: *(1)* open the UDP port in `docker-compose.yml`, and *(2)* add the source in `nfsen.conf`. The steps below do both.
+
 ### Step-by-step (example: new router on port 2070)
 
 1. Edit `docker-compose.yml` on the VPS:
@@ -206,6 +257,14 @@ That's it: the port opens **and** the router source is configured automatically.
 > ✅ **No data loss:** `docker compose up -d` keeps all your NetFlow data (it lives in the `nfsen-data/` folder next to `docker-compose.yml`).
 > ⚠️ **`docker compose down -v` no longer deletes your data** — it now uses bind mounts, and `-v` only removes *named* volumes. Your data only disappears if you `rm -rf` the folders yourself (see [Data Folders](#data-folders-bind-mounts)).
 
+**What each step did:**
+
+1. Adding `- "2070:2070/udp"` to `ports:` → Docker starts forwarding UDP 2070 from the VPS into the container.
+2. The `docker exec` command adds the `'myrouter'` source to `nfsen.conf` (which lives in `nfsen-etc/` on the host) and runs `nfsen reconfig` → reconfig starts an `nfcapd` collector on port 2070 and creates the `nfsen-data/live/myrouter/` folder.
+3. `docker compose up -d` recreates the container so the new port mapping takes effect (the image is **not** rebuilt).
+
+**Result:** packets from your router on port 2070 now flow: UDP → Docker → nfcapd → `nfsen-data/live/myrouter/` → RRD graphs → Web UI.
+
 ### Replace or remove the demo `router1` source
 
 The container ships with a demo source `router1` listening on port **2055** so the Web UI shows graphs on first install — **no manual setup needed**. It appears automatically on a fresh build, and the entrypoint also seeds it on any container that starts with zero sources (e.g. an older one whose config volume was seeded empty). Once you add your real routers, the fallback never runs again and your sources are never touched. Once you connect your real router, replace or remove the demo with `docker exec`:
@@ -230,6 +289,25 @@ Or simply add your real router on port 2055 (see [Add a source with IP](#add-a-s
 - **NetFlow data lives in the folders next to `docker-compose.yml`** (`nfsen-data/`, `nfsen-stat/`, `nfsen-var/`, `nfsen-etc/`) and survives rebuilds, recreates, and even `down -v` (see [Data Folders](#data-folders-bind-mounts))
 - ⚠️ `docker compose down -v` no longer deletes anything — only `rm -rf nfsen-data nfsen-stat nfsen-var nfsen-etc` does
 - ⚠️ `nfsen-etc/nfsen.conf` is seeded from the image only when the folder is **empty** — if you later change `config/nfsen.conf` in the repo, copy it over (`cp config/nfsen.conf nfsen-etc/nfsen.conf`) or delete the file and restart
+
+---
+
+## Credit Banner
+
+A small credit popup (Exonhost / Rezwan) prints **when the container starts** — it never shows during the build. `docker compose build` only *packages* the script into the image; the popup itself is printed by the entrypoint at container start.
+
+> ⚠️ **With `docker compose up -d` the banner does NOT appear in your terminal.** The container runs detached, so its output goes to the Docker logs. To see the banner:
+>
+> ```bash
+> docker compose up -d
+> docker logs exon-nfsen --tail 60    # the banner is at the TOP of this output
+> ```
+>
+> (Or run `docker compose up` without `-d` once — the banner prints directly in the terminal while the container runs in the foreground.)
+
+The banner pauses startup for ~5 seconds (`banner.sh 5` in the entrypoint) so it stays readable.
+
+To remove the banner completely, delete all three: the `COPY banner.sh` + `RUN chmod +x` step in the `Dockerfile`, the `/usr/local/bin/exonhost-banner.sh 5` line in `entrypoint.sh`, and the `banner.sh` file.
 
 ---
 
