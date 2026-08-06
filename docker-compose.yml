@@ -31,6 +31,13 @@ services:
       - ./nfsen-etc:/var/nfsen/etc
     environment:
       - TZ=Asia/Dhaka
+      # Password protection (login page): when nfsen-etc/.htpasswd does not
+      # exist yet, the entrypoint creates the default login user below.
+      # CHANGE THE PASSWORD right after first login with:
+      #   docker exec exon-nfsen htpasswd -b /var/nfsen/etc/.htpasswd admin <newpass>
+      # Uncomment to customize the defaults:
+      # - NFSEN_ADMIN_USER=admin
+      # - NFSEN_ADMIN_PASSWORD=change-me-now
       # A demo source 'router1' on port 2055 ships by default (in
       # config/nfsen.conf) so the Web UI shows graph placeholders on first
       # install. Replace it with your real routers (docker exec method in the

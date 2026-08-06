@@ -25,7 +25,7 @@ RUN chmod +x /usr/local/bin/exonhost-banner.sh
 # ===========================================================================
 RUN apt-get update && apt-get install -y \
     make gcc flex rrdtool librrd-dev libpcap-dev php \
-    librrds-perl libsocket6-perl apache2 libapache2-mod-php \
+    librrds-perl libsocket6-perl apache2 libapache2-mod-php apache2-utils \
     libtool dh-autoreconf pkg-config libbz2-dev byacc doxygen \
     graphviz librrdp-perl libmailtools-perl build-essential \
     autoconf wget curl cpanminus net-tools \
@@ -35,6 +35,13 @@ RUN apt-get update && apt-get install -y \
 # STEP 2: Enable PHP (guide: a2enmod php7.4)
 # ===========================================================================
 RUN a2enmod php7.4
+
+# ===========================================================================
+# STEP 2b: Enable Apache modules for the styled login page (form auth).
+# mod_auth_form + mod_session* provide the HTML login flow; mod_request is
+# used by mod_auth_form when reading the POSTed login form.
+# ===========================================================================
+RUN a2enmod auth_form authn_file session session_cookie session_crypto request
 
 # ===========================================================================
 # STEP 3: Fix Apache icons (guide: comment out Alias /icons/ line)
@@ -132,6 +139,11 @@ RUN ./install.pl ./etc/nfsen.conf \
         || { echo "[STEP 13 ERROR] nfsen.php NOT FOUND after install.pl!"; exit 1; }
 
 # ===========================================================================
+# STEP 13b: Install the styled login page (served by mod_auth_form on 401)
+# ===========================================================================
+COPY login.php /var/nfsen/www/login.php
+
+# ===========================================================================
 # STEP 14: Add restart command (missing from nfsen by default)
 # ===========================================================================
 RUN echo "[STEP 14] Adding restart command to nfsen..." && \
@@ -205,13 +217,14 @@ EXPOSE 2055/udp
 
 # Health check — short start-period now that the entrypoint boots in seconds
 # (a 60s start-period kept the container in "Starting" state for a full minute)
-# The Web UI returns HTTP 200 even when the nfsend daemon is DOWN (it renders
-# an error page), so ALSO require the daemon to actually be alive (pid file +
-# kill -0) and its Unix socket to exist — this is what catches the
-# "Can not initialize globals" state (a socket file alone can't be trusted:
-# it lingers if nfsend crashes mid-run).
+# With the login page enabled, every protected URL returns 401 before any PHP
+# runs, so the healthcheck no longer curls nfsen.php (it would always fail).
+# It verifies Apache is up by fetching the login page (always 200), then
+# checks the nfsend daemon pid + socket — this is what catches the "Can not
+# initialize globals" state (a socket file alone can't be trusted: it lingers
+# if nfsend crashes mid-run).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:8070/nfsen.php && [ -f /var/nfsen/var/run/nfsend.pid ] && kill -0 "$(cat /var/nfsen/var/run/nfsend.pid)" 2>/dev/null && test -S /var/nfsen/var/run/nfsen.comm || exit 1
+    CMD test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8070/login.php)" = "200" && [ -f /var/nfsen/var/run/nfsend.pid ] && kill -0 "$(cat /var/nfsen/var/run/nfsend.pid)" 2>/dev/null && test -S /var/nfsen/var/run/nfsen.comm || exit 1
 
 # ===========================================================================
 # Entrypoint

@@ -28,6 +28,25 @@ if [ ! -f "${NFSEN_BASEDIR}/etc/nfsen.conf" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Password protection - seed .htpasswd with the default admin user
+# ---------------------------------------------------------------------------
+# The Web UI is protected by an Apache login page. The password file lives in
+# nfsen-etc/.htpasswd (bind mount) so it survives rebuilds, and it is created
+# ONCE with a default user/password. Change it any time (takes effect
+# instantly, no restart) with:
+#   docker exec exon-nfsen htpasswd -b /var/nfsen/etc/.htpasswd <user> <newpass>
+NFSEN_ADMIN_USER="${NFSEN_ADMIN_USER:-admin}"
+NFSEN_ADMIN_PASSWORD="${NFSEN_ADMIN_PASSWORD:-change-me-now}"
+if [ ! -f "${NFSEN_BASEDIR}/etc/.htpasswd" ]; then
+    echo "[INFO] No .htpasswd found - creating default login: ${NFSEN_ADMIN_USER} / ${NFSEN_ADMIN_PASSWORD}"
+    echo "       >>> CHANGE THIS IMMEDIATELY: docker exec exon-nfsen htpasswd -b /var/nfsen/etc/.htpasswd ${NFSEN_ADMIN_USER} <your-password>"
+    htpasswd -bc "${NFSEN_BASEDIR}/etc/.htpasswd" "${NFSEN_ADMIN_USER}" "${NFSEN_ADMIN_PASSWORD}" \
+        || echo "[WARN] htpasswd failed - Apache login will reject everyone until .htpasswd exists"
+fi
+chown www-data:www-data "${NFSEN_BASEDIR}/etc/.htpasswd" 2>/dev/null || true
+chmod 640 "${NFSEN_BASEDIR}/etc/.htpasswd" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
 # Configure NetFlow sources from environment variable
 # ---------------------------------------------------------------------------
 if [ -n "$NFSEN_SOURCES" ]; then
@@ -123,6 +142,23 @@ fi
 chown netflow:www-data "${NFSEN_BASEDIR}"/profiles-data/live/* 2>/dev/null || true
 chown www-data:www-data "${NFSEN_BASEDIR}"/profiles-stat/live/* 2>/dev/null || true
 chmod 777 "${NFSEN_BASEDIR}/var/run" 2>/dev/null || true
+
+# The "first run" chmod -R 775 above would leave .htpasswd world-readable —
+# re-lock it so the password hashes stay private.
+chown www-data:www-data "${NFSEN_BASEDIR}/etc/.htpasswd" 2>/dev/null || true
+chmod 640 "${NFSEN_BASEDIR}/etc/.htpasswd" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Generate a random session-cookie encryption passphrase (once per container)
+# ---------------------------------------------------------------------------
+# SessionCryptoPassphrase protects the login session cookie. The baked vhost
+# ships a placeholder; replace it with a random 32+ byte value on first start
+# so every container instance uses its own key.
+if grep -q 'NFSEN_SESSION_CRYPTO_CHANGE_ME' /etc/apache2/sites-available/000-default.conf 2>/dev/null; then
+    CRYPTO_PASS="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+    sed -i "s|NFSEN_SESSION_CRYPTO_CHANGE_ME|${CRYPTO_PASS}|" /etc/apache2/sites-available/000-default.conf
+    echo "[INFO] Apache session crypto passphrase generated."
+fi
 
 # ---------------------------------------------------------------------------
 # Start Apache (guide: systemctl start apache2)

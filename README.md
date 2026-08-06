@@ -9,9 +9,10 @@
 3. [Managing Router Sources](#managing-router-sources)
 4. [Adding a Router on a New Port — how it actually works](#adding-a-router-on-a-new-port)
 5. [Credit Banner & Build Popup](#credit-banner--build-popup)
-6. [Notes](#notes)
-7. [Storage Full — Recover Disk Space](#-storage-full--recover-disk-space)
-8. [Troubleshooting](#troubleshooting)
+6. [Password Protection (Login Page)](#-password-protection-login-page)
+7. [Notes](#notes)
+8. [Storage Full — Recover Disk Space](#-storage-full--recover-disk-space)
+9. [Troubleshooting](#troubleshooting)
 
 ## Quick Start
 
@@ -26,6 +27,8 @@ sudo ./install.sh          # credit banner + confirmation popup, then build & st
 > **`--build` is only needed on the first run.** After that, restarting the container only requires `docker-compose down && docker-compose up -d` (no `--build`). Your sources, config, and data all persist thanks to the data folders next to `docker-compose.yml` (see [Data Folders](#data-folders-bind-mounts)).
 
 Access: **http://\<YOUR_IP\>:8070/nfsen.php**
+
+> 🔒 The Web UI is password-protected. First login: **`admin` / `change-me-now`** — change it right away (see [Password Protection (Login Page)](#-password-protection-login-page)).
 
 Timezone: **Asia/Dhaka**
 
@@ -332,6 +335,76 @@ docker logs exon-nfsen --tail 60    # banner is at the TOP of this output
 
 ---
 
+## 🔒 Password Protection (Login Page)
+
+The Web UI is protected by a **styled HTML login page** (Apache `mod_auth_form`). Nobody can view the graphs, the raw flow data, or any NfSen page without signing in.
+
+### Enable it (once, on your VPS)
+
+```bash
+git pull
+sudo ./install.sh          # rebuilds once to apply the login page
+```
+
+Your data folders and router sources are untouched by this.
+
+### First login
+
+Open `http://<YOUR_IP>:8070/` — you'll be asked to sign in:
+
+| Field | Value |
+|---|---|
+| Username | `admin` |
+| Password | `change-me-now` |
+
+> ⚠️ **Change the password immediately** — one command, takes effect instantly, **no restart needed**:
+
+```bash
+docker exec exon-nfsen htpasswd -b /var/nfsen/etc/.htpasswd admin YourNewPass123
+```
+
+### Manage users (add / remove / list)
+
+```bash
+# Add or update a user
+docker exec exon-nfsen htpasswd -b /var/nfsen/etc/.htpasswd viewer viewerpass
+
+# Remove a user
+docker exec exon-nfsen htpasswd -D /var/nfsen/etc/.htpasswd viewer
+
+# List existing users
+docker exec exon-nfsen cut -d: -f1 /var/nfsen/etc/.htpasswd
+```
+
+The password file is **`nfsen-etc/.htpasswd`** on the VPS (a bind mount, like your data folders) — it survives rebuilds, restarts, and even `down -v`. Only `rm -rf` deletes it.
+
+### Log out
+
+Visit **`http://<YOUR_IP>:8070/logout`**.
+
+### Customize the default credentials (first boot only)
+
+Set these in `docker-compose.yml` (they only apply while `.htpasswd` doesn't exist yet):
+
+```yaml
+environment:
+  - NFSEN_ADMIN_USER=admin
+  - NFSEN_ADMIN_PASSWORD=change-me-now
+```
+
+### Security notes
+
+- The password travels **in clear text over plain HTTP**. For a production VPS, put HTTPS (TLS) in front of port 8070 (self-signed now, Let's Encrypt if you have a domain pointing at the server).
+- Sessions last until the browser is closed. There is no brute-force rate limiting on the login page (consider a firewall / fail2ban rule on port 8070 for extra hardening).
+- Only the Web UI is protected. The NetFlow UDP collection ports (2055, 2056, …) are unaffected.
+- Need the login page removed again? Delete the auth block from `config/000-default.conf` and rebuild.
+
+### Design & Credits
+
+The login page is **Exonhost-branded**: it shows the Exonhost logo and wordmark, and the footer reads *"Powered by **Exonhost** — Best Domain & Hosting Service Provider in Bangladesh"* with the project credit *"Created by **Rezwan Abdullah**"*. The same branding appears in the container-start banner (see [Credit Banner & Build Popup](#credit-banner--build-popup)).
+
+---
+
 ## 🔥 Storage Full — Recover Disk Space
 
 NfSen's NetFlow capture files accumulate quickly. When your VPS disk fills up (100%), `docker exec` commands will fail with:
@@ -468,3 +541,4 @@ docker exec exon-nfsen bash -c "\
 | Can't access port 8070 | Check firewall: `ufw allow 8070/tcp` |
 | NfSen not starting | `docker logs exon-nfsen --tail 30`, then `docker restart exon-nfsen` |
 | `nfsend connect() error` after disk full | Socket is dead. Restart the container: `docker restart exon-nfsen` |
+| Login page rejects the password you're sure is right | Reset it instantly, no restart: `docker exec exon-nfsen htpasswd -b /var/nfsen/etc/.htpasswd admin <newpass>` (file lives at `nfsen-etc/.htpasswd` on the host) |
