@@ -395,13 +395,13 @@ environment:
 ### Security notes
 
 - The password travels **in clear text over plain HTTP**. For a production VPS, put HTTPS (TLS) in front of port 8070 (self-signed now, Let's Encrypt if you have a domain pointing at the server).
-- Sessions last until the browser is closed. There is no brute-force rate limiting on the login page (consider a firewall / fail2ban rule on port 8070 for extra hardening).
+- **Login sessions expire after 30 minutes of inactivity** (`SessionMaxAge 1800` in `config/000-default.conf`) — after that every visit requires the username and password again. To change the lifetime, edit `SessionMaxAge` (value in seconds; `0` = never expire) and rebuild.
 - Only the Web UI is protected. The NetFlow UDP collection ports (2055, 2056, …) are unaffected.
 - Need the login page removed again? Delete the auth block from `config/000-default.conf` and rebuild.
 
 ### Design & Credits
 
-The login page is **Exonhost-branded**: it shows the Exonhost logo and wordmark, and the footer reads *"Powered by **Exonhost** — Best Domain & Hosting Service Provider in Bangladesh"* with the project credit *"Created by **Rezwan Abdullah**"*. The same branding appears in the container-start banner (see [Credit Banner & Build Popup](#credit-banner--build-popup)).
+The login page is **Exonhost-branded**: it shows the **official Exonhost logo** (embedded from exonhost.com), and the footer reads *"Powered by **Exonhost** — Best Domain & Hosting Service Provider in Bangladesh"* with the project credit *"Created by **Rezwan Abdullah**"*. The same branding appears in the container-start banner (see [Credit Banner & Build Popup](#credit-banner--build-popup)).
 
 ---
 
