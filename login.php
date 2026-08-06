@@ -8,8 +8,8 @@
  * the form below POSTs back to /nfsen.php, where mod_auth_form validates the
  * credentials against /var/nfsen/etc/.htpasswd and sets a session cookie.
  *
- * Sessions expire after 30 minutes (SessionMaxAge 1800 in 000-default.conf) —
- * after that every visit requires the username and password again.
+ * The login cookie is a browser-session cookie (dies when the browser
+ * closes), and session-guard.php auto-logs you out after 1 hour of inactivity.
  *
  * Because this page is rendered as the 401 response, a POST request that
  * lands here means the previous login attempt was rejected (mod_auth_form
@@ -20,6 +20,7 @@
  */
 $login_failed = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') || isset($_GET['error']);
 $logged_out   = isset($_GET['loggedout']);
+$expired      = isset($_GET['expired']);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -86,6 +87,7 @@ $logged_out   = isset($_GET['loggedout']);
   }
   .banner.error{background:rgba(248,113,113,.10);border:1px solid rgba(248,113,113,.28);color:#fecaca}
   .banner.ok{background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.28);color:#a7f3d0}
+  .banner.info{background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.28);color:#a5f3fc}
   .banner svg{flex:none;margin-top:1px}
   form{display:grid;gap:16px}
   .field label{
@@ -147,12 +149,19 @@ $logged_out   = isset($_GET['loggedout']);
       </div>
       <p class="brand-sub">NfSen NetFlow Analyzer · Protected sign-in</p>
     </div>
-    <p class="sub">Sign in to view your network flow data. Your session expires after 30 minutes.</p>
+    <p class="sub">Sign in to view your network flow data. Your session ends when you close the browser, or after 1 hour of inactivity.</p>
 
     <?php if ($logged_out): ?>
       <div class="banner ok">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         <span>You have been signed out.</span>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($expired): ?>
+      <div class="banner info">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Your session has expired after 1 hour of inactivity. Please sign in again.</span>
       </div>
     <?php endif; ?>
 

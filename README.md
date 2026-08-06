@@ -395,7 +395,8 @@ environment:
 ### Security notes
 
 - The password travels **in clear text over plain HTTP**. For a production VPS, put HTTPS (TLS) in front of port 8070 (self-signed now, Let's Encrypt if you have a domain pointing at the server).
-- **Login sessions expire after 30 minutes of inactivity** (`SessionMaxAge 1800` in `config/000-default.conf`) — after that every visit requires the username and password again. To change the lifetime, edit `SessionMaxAge` (value in seconds; `0` = never expire) and rebuild.
+- **Login sessions end when you close the browser** — the login cookie is a browser-session cookie (no expiry), so closing the browser and reopening the site shows the login page again.
+- **Sessions also auto-expire after 1 hour of inactivity** — enforced by `session-guard.php`, which runs before every NfSen page (`auto_prepend_file`). Staying on the login page never logs you out. To change the limit, edit `NFSEN_LOGIN_MAX_AGE` at the top of `session-guard.php` (value in seconds) and rebuild.
 - Only the Web UI is protected. The NetFlow UDP collection ports (2055, 2056, …) are unaffected.
 - Need the login page removed again? Delete the auth block from `config/000-default.conf` and rebuild.
 

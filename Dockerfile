@@ -140,8 +140,10 @@ RUN ./install.pl ./etc/nfsen.conf \
 
 # ===========================================================================
 # STEP 13b: Install the styled login page (served by mod_auth_form on 401)
+# and the 1-hour auto-logout guard (auto_prepend_file for every PHP page)
 # ===========================================================================
 COPY login.php /var/nfsen/www/login.php
+COPY session-guard.php /var/nfsen/www/session-guard.php
 
 # ===========================================================================
 # STEP 14: Add restart command (missing from nfsen by default)
